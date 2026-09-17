@@ -3,6 +3,8 @@ import { sql } from "@/lib/db";
 import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
 import AutoRefresh from "@/components/AutoRefresh";
+import StationMapModal from "@/components/StationMapModal";
+import type { Station } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,8 @@ interface StationRow {
   code: string;
   name: string;
   waterbody: string;
+  latitude: number | null;
+  longitude: number | null;
   level_value: number | null;
   level_unit: string | null;
   level_observed_at: string | null;
@@ -30,7 +34,7 @@ async function getLastIngestRun(): Promise<string | null> {
 async function getStations(): Promise<StationRow[]> {
   const rows = await sql`
     SELECT
-      s.code, s.name, s.waterbody,
+      s.code, s.name, s.waterbody, s.latitude, s.longitude,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
       flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at
     FROM stations s
@@ -55,20 +59,33 @@ export default async function DashboardPage() {
     getLastIngestRun(),
   ]);
 
+  const mapStations: Station[] = stations
+    .filter((s) => s.latitude != null && s.longitude != null)
+    .map((s) => ({
+      code: s.code,
+      name: s.name,
+      waterbody: s.waterbody,
+      latitude: s.latitude,
+      longitude: s.longitude,
+    }));
+
   return (
     <AutoRefresh intervalSeconds={60}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Lakes &amp; Rivers near Harrison Hot Springs</h1>
-          <p className="text-sm text-black/60 dark:text-white/60 mt-1">
-            Real-time water level and flow readings from Environment and Climate Change Canada gauges.
-          </p>
-          <p className="text-xs text-black/50 dark:text-white/50 mt-2">
-            Updates every {INGEST_INTERVAL_MINUTES} minutes
-            {lastRunFinishedAt && <> &middot; last checked {formatRelativeTime(lastRunFinishedAt)}</>}
-            {" "}&middot; next update{" "}
-            {formatNextUpdate(lastRunFinishedAt, INGEST_INTERVAL_MINUTES)}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Lakes &amp; Rivers near Harrison Hot Springs</h1>
+            <p className="text-sm text-black/60 dark:text-white/60 mt-1">
+              Real-time water level and flow readings from Environment and Climate Change Canada gauges.
+            </p>
+            <p className="text-xs text-black/50 dark:text-white/50 mt-2">
+              Updates every {INGEST_INTERVAL_MINUTES} minutes
+              {lastRunFinishedAt && <> &middot; last checked {formatRelativeTime(lastRunFinishedAt)}</>}
+              {" "}&middot; next update{" "}
+              {formatNextUpdate(lastRunFinishedAt, INGEST_INTERVAL_MINUTES)}
+            </p>
+          </div>
+          {mapStations.length > 0 && <StationMapModal stations={mapStations} />}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
