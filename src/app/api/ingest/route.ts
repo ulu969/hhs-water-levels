@@ -6,13 +6,19 @@ import { upsertReadings } from "@/lib/upsertReadings";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+// Accepts either secret: CRON_SECRET is what Vercel Cron auto-injects as
+// `Authorization: Bearer $CRON_SECRET` on scheduled GET requests; INGEST_SECRET
+// is for manual calls / the GitHub Actions fallback (POST).
+function isAuthorized(req: NextRequest): boolean {
   const auth = req.headers.get("authorization");
-  const expected = `Bearer ${process.env.INGEST_SECRET}`;
-  if (!process.env.INGEST_SECRET || auth !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth) return false;
+  return (
+    (!!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) ||
+    (!!process.env.INGEST_SECRET && auth === `Bearer ${process.env.INGEST_SECRET}`)
+  );
+}
 
+async function runIngest() {
   const startedAt = new Date();
 
   try {
@@ -37,4 +43,20 @@ export async function POST(req: NextRequest) {
     `;
     return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
+}
+
+// Vercel Cron triggers scheduled jobs with GET.
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runIngest();
+}
+
+// Kept for manual calls and the GitHub Actions fallback workflow.
+export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runIngest();
 }

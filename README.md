@@ -7,13 +7,13 @@ hydrometric web services (`wateroffice.ec.gc.ca`).
 ## How it works
 
 ```
-ECCC recent_real_time_data (CSV) --(scheduled POST)--> /api/ingest --> Neon Postgres --> Next.js pages
+ECCC recent_real_time_data (CSV) --(Vercel Cron, every 5 min)--> /api/ingest --> Neon Postgres --> Next.js pages
 ```
 
 - **Ingestion** (`src/app/api/ingest/route.ts`) fetches the latest water
   level (parameter 46) and flow (parameter 47) readings for all 10 stations
-  in a single request and upserts them into Postgres. It's triggered by an
-  external scheduler, not the browser — see "Scheduling" below.
+  in a single request and upserts them into Postgres. It's triggered by
+  Vercel Cron (`vercel.json`), not the browser — see "Scheduling" below.
 - **Storage**: Neon Postgres. Tables: `stations`, `readings`, `thresholds`
   (flood-stage reference lines), `settings` (ingestion interval), `ingest_runs`
   (a log for monitoring ingestion health).
@@ -30,7 +30,8 @@ standalone PWA on Chromium browsers, gives no guaranteed interval, and does
 nothing while your computer is off or the browser is closed — which
 contradicts the requirement that data keeps flowing independent of your own
 machine. The ingestion job instead runs as a server-side scheduled call to
-`/api/ingest`, authenticated with a bearer token (`INGEST_SECRET`).
+`/api/ingest`, authenticated with a bearer token (`CRON_SECRET` for Vercel
+Cron, or `INGEST_SECRET` for manual/GitHub Actions calls).
 
 ## Local setup
 
@@ -72,34 +73,42 @@ Tables:
   INSERT INTO thresholds (station_code, parameter, label, value, unit)
   VALUES ('08MG012', 'level', 'Flood Watch', 12.5, 'm');
   ```
-- `settings(key, value)` — currently just `ingest_interval_minutes` (default
-  `5`). The ingestion endpoint itself runs whenever the scheduler calls it;
-  this setting is a record of intent for now (see "Changing the interval").
+- `settings(key, value)` — currently just `ingest_interval_minutes`, an
+  unread record of intent (the real interval is `vercel.json`'s cron
+  expression, mirrored in `src/lib/config.ts` for the dashboard label).
 - `ingest_runs(started_at, finished_at, stations_ok, stations_failed, rows_inserted, error)` —
   a log to monitor ingestion health.
 
 ## Scheduling the 5-minute fetch
 
-Vercel's Hobby (free) plan only allows daily cron jobs, so the recommended
-path is a GitHub Actions scheduled workflow instead
-(`.github/workflows/ingest.yml`), which polls every 5 minutes. GitHub does
-not guarantee exact timing and disables scheduled workflows after 60 days of
-repository inactivity — acceptable for this use case, but worth knowing.
+**Primary scheduler: Vercel Cron** (`vercel.json`), requires the Pro plan —
+Hobby only allows daily cron jobs. It calls `/api/ingest` via `GET` every 5
+minutes; Vercel auto-injects `Authorization: Bearer $CRON_SECRET` on cron
+requests, which the route checks against the `CRON_SECRET` env var.
 
-Set these repository secrets (Settings → Secrets and variables → Actions):
-- `INGEST_URL` — e.g. `https://your-deployment.vercel.app/api/ingest`
-- `INGEST_SECRET` — same value as in `.env.local` / your Vercel project env vars
+We initially tried a GitHub Actions scheduled workflow instead (`cron: "*/5
+* * * *"` in `.github/workflows/ingest.yml`). In practice it was unreliable
+for this: GitHub treats high-frequency (sub-hourly) schedules as low-priority
+on lower-traffic repos, and it ended up firing roughly once every 5 *hours*
+instead of every 5 minutes — a documented limitation, not something fixable
+by tweaking the cron expression. That workflow is kept only as a manual
+"run it now" fallback (`workflow_dispatch`), not as the real scheduler.
 
-If you're on Vercel Pro, you can instead add a `vercel.json` cron entry
-pointing at `/api/ingest` at whatever interval you like, and drop the GitHub
-Actions workflow.
+Vercel project env vars needed:
+- `DATABASE_URL`, `INGEST_SECRET` (see "Local setup" above)
+- `CRON_SECRET` — any random string; Vercel sends it automatically on cron
+  requests. Doesn't need to match `INGEST_SECRET`, but can.
+
+GitHub repository secrets (only needed for the manual fallback):
+- `INGEST_URL` — `https://your-deployment.vercel.app/api/ingest`
+- `INGEST_SECRET` — same value as the Vercel env var
 
 ### Changing the interval
 
-Update the `ingest_interval_minutes` row in `settings`, and change the cron
-expression in `.github/workflows/ingest.yml` (or your Vercel cron config) to
-match. A future improvement would be having the ingest route read this
-setting and self-report if the actual call cadence drifts from it.
+Edit the `schedule` in `vercel.json` and redeploy. There's no in-app control
+for this — it was considered and deliberately dropped in favor of a fixed
+5-minute cadence (see the dashboard's "next update" label, sourced from
+`ingest_runs`).
 
 ## Backfilling history
 
@@ -137,10 +146,12 @@ to retry just the failed range.
 ## Deployment
 
 1. Push this repo to GitHub.
-2. Import it into Vercel; add `DATABASE_URL` and `INGEST_SECRET` as
-   environment variables.
-3. Add the `INGEST_URL` / `INGEST_SECRET` repository secrets in GitHub so the
-   Actions workflow can reach the deployed `/api/ingest` endpoint.
+2. Import it into Vercel (Pro plan, for cron support); add `DATABASE_URL`,
+   `INGEST_SECRET`, and `CRON_SECRET` as environment variables. Vercel picks
+   up `vercel.json`'s cron config automatically on deploy.
+3. (Optional, for the manual fallback) add the `INGEST_URL` / `INGEST_SECRET`
+   repository secrets in GitHub so `workflow_dispatch` can reach the deployed
+   `/api/ingest` endpoint on demand.
 
 ## Known limitations / next steps
 

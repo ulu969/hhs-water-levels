@@ -1,12 +1,12 @@
-name: Ingest hydrometric data
+name: Ingest hydrometric data (manual)
 
+# The real 5-minute schedule is now Vercel Cron (see vercel.json), running on
+# the Pro plan. GitHub Actions' own scheduler proved unreliable for
+# high-frequency cron here — in practice it fired roughly once every 5 hours
+# instead of every 5 minutes, a documented limitation for frequent schedules
+# on lower-traffic repos. This workflow is kept only as a manual "run it now"
+# fallback, not as the primary trigger.
 on:
-  schedule:
-    # Vercel's Hobby plan only allows daily cron jobs, so the 5-minute poll
-    # is driven from here instead. GitHub does not guarantee exact timing
-    # for scheduled workflows and disables them after 60 days of repo
-    # inactivity (a manual run or push re-enables them).
-    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 jobs:
