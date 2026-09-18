@@ -8,6 +8,8 @@ export interface Station {
   waterbody: string;
   latitude: number | null;
   longitude: number | null;
+  currentCondition: string | null;
+  currentConditionUpdatedAt: string | null;
 }
 
 export interface Reading {

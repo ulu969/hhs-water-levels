@@ -92,3 +92,37 @@ export async function fetchHistoricalReadings(
 function formatEcccDate(date: Date): string {
   return date.toISOString().slice(0, 19).replace("T", " ");
 }
+
+export interface FetchedCondition {
+  stationCode: string;
+  condition: string;
+}
+
+interface MapDataStation {
+  station_id: string;
+  current_conditions: string | null;
+}
+
+// Fetches the same feed the map's markers use (all real-time stations in
+// Canada) and filters down to ours. `current_conditions` is a ranking of the
+// latest discharge against this day's historical record (e.g.
+// MUCH_BELOW_NORMAL) — ECCC computes it, we don't. Stations that don't
+// report discharge consistently come back as NO_DISCHARGE_DATA rather than
+// being omitted.
+export async function fetchCurrentConditions(
+  stationCodes: readonly string[]
+): Promise<FetchedCondition[]> {
+  const res = await fetch(`${BASE_URL}/map_data?data_type=real_time`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`ECCC map_data request failed: ${res.status}`);
+  }
+
+  const data = (await res.json()) as MapDataStation[];
+  const codes = new Set(stationCodes);
+
+  return data
+    .filter((s): s is MapDataStation & { current_conditions: string } =>
+      codes.has(s.station_id) && !!s.current_conditions
+    )
+    .map((s) => ({ stationCode: s.station_id, condition: s.current_conditions }));
+}

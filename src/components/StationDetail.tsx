@@ -12,7 +12,8 @@ import {
   YAxis,
 } from "recharts";
 import type { Parameter, Resolution, Station, Threshold } from "@/lib/types";
-import { formatTimestamp, formatValue } from "@/lib/format";
+import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
+import { getConditionInfo } from "@/lib/conditions";
 
 const RANGES: { value: string; label: string }[] = [
   { value: "24h", label: "Last 24 hours" },
@@ -81,6 +82,7 @@ export default function StationDetail({
   );
 
   const unit = readings[0]?.unit ?? (parameter === "level" ? "m" : "m³/s");
+  const conditionInfo = getConditionInfo(station.currentCondition);
 
   const chartData = useMemo(
     () =>
@@ -98,6 +100,18 @@ export default function StationDetail({
         <p className="text-sm text-black/60 dark:text-white/60">
           {station.waterbody} &middot; Station {station.code}
         </p>
+        {conditionInfo && (
+          <p className="mt-2">
+            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${conditionInfo.badgeClass}`}>
+              {conditionInfo.label}
+            </span>
+            {station.currentConditionUpdatedAt && (
+              <span className="ml-2 text-xs text-black/40 dark:text-white/40">
+                as of {formatRelativeTime(station.currentConditionUpdatedAt)}
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-4">

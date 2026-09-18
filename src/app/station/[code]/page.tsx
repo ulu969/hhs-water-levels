@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 async function getStation(code: string): Promise<Station | null> {
   const rows = await sql`
-    SELECT code, name, waterbody, latitude, longitude
+    SELECT code, name, waterbody, latitude, longitude,
+      current_condition, current_condition_updated_at
     FROM stations WHERE code = ${code}
   `;
   if (rows.length === 0) return null;
@@ -18,6 +19,8 @@ async function getStation(code: string): Promise<Station | null> {
     waterbody: r.waterbody as string,
     latitude: r.latitude as number | null,
     longitude: r.longitude as number | null,
+    currentCondition: r.current_condition as string | null,
+    currentConditionUpdatedAt: r.current_condition_updated_at as string | null,
   };
 }
 

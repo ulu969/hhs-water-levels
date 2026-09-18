@@ -2,6 +2,7 @@ import Link from "next/link";
 import { sql } from "@/lib/db";
 import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
+import { getConditionInfo } from "@/lib/conditions";
 import AutoRefresh from "@/components/AutoRefresh";
 import StationMapModal from "@/components/StationMapModal";
 import type { Station } from "@/lib/types";
@@ -14,6 +15,8 @@ interface StationRow {
   waterbody: string;
   latitude: number | null;
   longitude: number | null;
+  current_condition: string | null;
+  current_condition_updated_at: string | null;
   level_value: number | null;
   level_unit: string | null;
   level_observed_at: string | null;
@@ -35,6 +38,7 @@ async function getStations(): Promise<StationRow[]> {
   const rows = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
+      s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
       flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at
     FROM stations s
@@ -67,6 +71,8 @@ export default async function DashboardPage() {
       waterbody: s.waterbody,
       latitude: s.latitude,
       longitude: s.longitude,
+      currentCondition: s.current_condition,
+      currentConditionUpdatedAt: s.current_condition_updated_at,
     }));
 
   return (
@@ -100,6 +106,7 @@ export default async function DashboardPage() {
                 <span className="text-xs text-black/40 dark:text-white/40 shrink-0">{s.code}</span>
               </div>
               <p className="text-xs text-black/50 dark:text-white/50">{s.waterbody}</p>
+              <ConditionBadge code={s.current_condition} />
 
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Metric
@@ -120,6 +127,19 @@ export default async function DashboardPage() {
         </div>
       </div>
     </AutoRefresh>
+  );
+}
+
+function ConditionBadge({ code }: { code: string | null }) {
+  const info = getConditionInfo(code);
+  if (!info) return null;
+
+  return (
+    <span
+      className={`inline-block mt-2 rounded-full px-2 py-0.5 text-xs ${info.badgeClass}`}
+    >
+      {info.label}
+    </span>
   );
 }
 

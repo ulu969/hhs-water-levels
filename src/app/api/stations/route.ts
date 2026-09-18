@@ -7,6 +7,7 @@ export async function GET() {
   const stations = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
+      s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
       flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at
     FROM stations s
@@ -35,6 +36,8 @@ export async function GET() {
     waterbody: s.waterbody as string,
     latitude: s.latitude as number | null,
     longitude: s.longitude as number | null,
+    currentCondition: s.current_condition as string | null,
+    currentConditionUpdatedAt: s.current_condition_updated_at as string | null,
     level: s.level_value != null
       ? { value: s.level_value as number, unit: s.level_unit as string, observedAt: s.level_observed_at as string }
       : null,

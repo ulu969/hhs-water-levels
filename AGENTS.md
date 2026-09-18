@@ -1,3 +1,32 @@
+<!-- added by JFC from Flavio Bootcamp 2026 week 1 -->
+
+# Project instructions
+
+## Setup
+
+- Install with `npm install`.
+- Start development with `npm run dev`.
+
+## Project map
+
+- Application code: `src/`
+- Tests: `tests/`
+- Operational docs: `docs/`
+- Generated output: `dist/` — do not edit.
+
+## Rules
+
+- Keep changes inside the requested scope.
+- Never commit secrets or `.env` files.
+- Ask before adding production dependencies.
+
+## Verification
+
+- Run `npm test` after code changes.
+- Run `npm run build` after routing or content changes.
+- Report skipped checks and the reason.
+<!-- end add by JFC -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

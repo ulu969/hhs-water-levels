@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { fetchRecentReadings } from "@/lib/eccc";
+import { fetchCurrentConditions, fetchRecentReadings } from "@/lib/eccc";
 import { STATION_CODES } from "@/lib/stations";
 import { upsertReadings } from "@/lib/upsertReadings";
+import { updateConditions } from "@/lib/updateConditions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +23,14 @@ async function runIngest() {
   const startedAt = new Date();
 
   try {
-    const readings = await fetchRecentReadings(STATION_CODES);
-    const rowsInserted = await upsertReadings(sql, readings);
+    const [readings, conditions] = await Promise.all([
+      fetchRecentReadings(STATION_CODES),
+      fetchCurrentConditions(STATION_CODES),
+    ]);
+    const [rowsInserted] = await Promise.all([
+      upsertReadings(sql, readings),
+      updateConditions(sql, conditions),
+    ]);
 
     await sql`
       INSERT INTO ingest_runs (started_at, finished_at, stations_ok, stations_failed, rows_inserted)
