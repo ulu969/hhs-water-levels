@@ -106,7 +106,6 @@ export default async function DashboardPage() {
                 <span className="text-xs text-black/40 dark:text-white/40 shrink-0">{s.code}</span>
               </div>
               <p className="text-xs text-black/50 dark:text-white/50">{s.waterbody}</p>
-              <ConditionBadge code={s.current_condition} />
 
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Metric
@@ -120,6 +119,7 @@ export default async function DashboardPage() {
                   value={s.flow_value}
                   unit={s.flow_unit}
                   observedAt={s.flow_observed_at}
+                  badge={<ConditionBadge code={s.current_condition} />}
                 />
               </div>
             </Link>
@@ -148,17 +148,20 @@ function Metric({
   value,
   unit,
   observedAt,
+  badge,
 }: {
   label: string;
   value: number | null;
   unit: string | null;
   observedAt: string | null;
+  badge?: React.ReactNode;
 }) {
   if (value == null || unit == null || observedAt == null) {
     return (
       <div>
         <p className="text-xs text-black/50 dark:text-white/50">{label}</p>
         <p className="text-sm text-black/40 dark:text-white/40">No data</p>
+        {badge}
       </div>
     );
   }
@@ -172,6 +175,7 @@ function Metric({
       <p className={`text-xs ${stale ? "text-amber-600 dark:text-amber-400" : "text-black/40 dark:text-white/40"}`}>
         {formatRelativeTime(observedAt)}
       </p>
+      {badge}
     </div>
   );
 }
