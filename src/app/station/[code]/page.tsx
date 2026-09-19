@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import StationDetail from "@/components/StationDetail";
 import { classifyByPercentile } from "@/lib/conditions";
-import type { Station, Threshold } from "@/lib/types";
+import type { Station, StationRecord, Threshold } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,19 @@ async function getStation(code: string): Promise<Station | null> {
   };
 }
 
+async function getRecords(code: string): Promise<StationRecord[]> {
+  const rows = await sql`
+    SELECT parameter, record_type, value, observed_at
+    FROM station_records WHERE station_code = ${code}
+  `;
+  return rows.map((r) => ({
+    parameter: r.parameter as "level" | "flow",
+    recordType: r.record_type as "maximum" | "minimum",
+    value: r.value as number,
+    observedAt: r.observed_at as string,
+  }));
+}
+
 async function getThresholds(code: string): Promise<Threshold[]> {
   const rows = await sql`
     SELECT parameter, label, value, unit, notes
@@ -74,7 +87,7 @@ export default async function StationPage({
   const station = await getStation(code);
   if (!station) notFound();
 
-  const thresholds = await getThresholds(code);
+  const [thresholds, records] = await Promise.all([getThresholds(code), getRecords(code)]);
 
-  return <StationDetail station={station} thresholds={thresholds} />;
+  return <StationDetail station={station} thresholds={thresholds} records={records} />;
 }

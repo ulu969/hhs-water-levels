@@ -32,3 +32,10 @@ export interface LatestReadings {
   level: Reading | null;
   flow: Reading | null;
 }
+
+export interface StationRecord {
+  parameter: Parameter;
+  recordType: "maximum" | "minimum";
+  value: number;
+  observedAt: string;
+}

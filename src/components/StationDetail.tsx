@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Parameter, Resolution, Station, Threshold } from "@/lib/types";
+import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
 import { getConditionInfo, isOutOfRange, relevantStatLabel } from "@/lib/conditions";
 
@@ -31,9 +31,11 @@ interface ReadingPoint {
 export default function StationDetail({
   station,
   thresholds,
+  records,
 }: {
   station: Station;
   thresholds: Threshold[];
+  records: StationRecord[];
 }) {
   const [parameter, setParameter] = useState<Parameter>("level");
   const [range, setRange] = useState("24h");
@@ -84,6 +86,8 @@ export default function StationDetail({
   const unit = readings[0]?.unit ?? (parameter === "level" ? "m" : "m³/s");
   const flowConditionInfo = getConditionInfo(station.currentCondition);
   const levelConditionInfo = getConditionInfo(station.currentLevelCondition);
+  const levelRecord = relevantRecord(records, "level", station.currentLevelCondition);
+  const flowRecord = relevantRecord(records, "flow", station.currentCondition);
 
   const chartData = useMemo(
     () =>
@@ -158,6 +162,12 @@ export default function StationDetail({
           )}
         </p>
       )}
+      {parameter === "level" && levelRecord && (
+        <p className="text-xs text-black/50 dark:text-white/50">
+          Previous record: {formatValue(levelRecord.value, "m")} on{" "}
+          {formatTimestamp(levelRecord.observedAt)}
+        </p>
+      )}
 
       {parameter === "flow" && flowConditionInfo && (
         <p>
@@ -182,6 +192,12 @@ export default function StationDetail({
               &rarr;
             </a>
           )}
+        </p>
+      )}
+      {parameter === "flow" && flowRecord && (
+        <p className="text-xs text-black/50 dark:text-white/50">
+          Previous record: {formatValue(flowRecord.value, "m³/s")} on{" "}
+          {formatTimestamp(flowRecord.observedAt)}
         </p>
       )}
 
@@ -279,6 +295,19 @@ export default function StationDetail({
       )}
     </div>
   );
+}
+
+// Only meaningful for the two all-time codes — the yellow "much above/below"
+// tier isn't tied to a single record, just a percentile boundary (that's
+// what the ECCC link's "tick ... quartile" hint is for instead).
+function relevantRecord(
+  records: StationRecord[],
+  parameter: Parameter,
+  condition: string | null
+): StationRecord | null {
+  const recordType = condition === "ALL_TIME_LOW" ? "minimum" : condition === "ALL_TIME_HIGH" ? "maximum" : null;
+  if (!recordType) return null;
+  return records.find((r) => r.parameter === parameter && r.recordType === recordType) ?? null;
 }
 
 function ecccReportUrl(stationCode: string): string {
