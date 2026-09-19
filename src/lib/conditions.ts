@@ -75,6 +75,20 @@ export function getConditionInfo(code: string | null | undefined): ConditionInfo
   return CONDITION_INFO[code as ConditionCode] ?? FALLBACK;
 }
 
+const OUT_OF_RANGE_CODES: ReadonlySet<string> = new Set([
+  "ALL_TIME_HIGH",
+  "MUCH_ABOVE_NORMAL",
+  "MUCH_BELOW_NORMAL",
+  "ALL_TIME_LOW",
+]);
+
+// True only for the red/yellow tiers — the ones worth linking out to ECCC's
+// own graph for. Green (including the "no data" cases) never counts, since
+// there's nothing unusual to go look at.
+export function isOutOfRange(code: string | null | undefined): boolean {
+  return !!code && OUT_OF_RANGE_CODES.has(code);
+}
+
 export interface PercentileBand {
   p0: number;
   p10: number;

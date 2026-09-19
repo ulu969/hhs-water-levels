@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import type { Parameter, Resolution, Station, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
-import { getConditionInfo } from "@/lib/conditions";
+import { getConditionInfo, isOutOfRange } from "@/lib/conditions";
 
 const RANGES: { value: string; label: string }[] = [
   { value: "24h", label: "Last 24 hours" },
@@ -143,6 +143,16 @@ export default function StationDetail({
               as of {formatRelativeTime(station.currentLevelConditionUpdatedAt)}
             </span>
           )}
+          {isOutOfRange(station.currentLevelCondition) && (
+            <a
+              href={ecccReportUrl(station.code)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+            >
+              View on ECCC &rarr;
+            </a>
+          )}
         </p>
       )}
 
@@ -155,6 +165,16 @@ export default function StationDetail({
             <span className="ml-2 text-xs text-black/40 dark:text-white/40">
               as of {formatRelativeTime(station.currentConditionUpdatedAt)}
             </span>
+          )}
+          {isOutOfRange(station.currentCondition) && (
+            <a
+              href={ecccReportUrl(station.code)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+            >
+              View on ECCC &rarr;
+            </a>
           )}
         </p>
       )}
@@ -253,6 +273,11 @@ export default function StationDetail({
       )}
     </div>
   );
+}
+
+function ecccReportUrl(stationCode: string): string {
+  const params = new URLSearchParams({ stn: stationCode, data_type: "real_time", mode: "Graph" });
+  return `https://wateroffice.ec.gc.ca/report/real_time_e.html?${params.toString()}`;
 }
 
 function formatAxisTick(timestamp: number, resolution: Resolution): string {
