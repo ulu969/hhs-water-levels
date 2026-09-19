@@ -100,18 +100,6 @@ export default function StationDetail({
         <p className="text-sm text-black/60 dark:text-white/60">
           {station.waterbody} &middot; Station {station.code}
         </p>
-        {conditionInfo && (
-          <p className="mt-2">
-            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${conditionInfo.badgeClass}`}>
-              {conditionInfo.label}
-            </span>
-            {station.currentConditionUpdatedAt && (
-              <span className="ml-2 text-xs text-black/40 dark:text-white/40">
-                as of {formatRelativeTime(station.currentConditionUpdatedAt)}
-              </span>
-            )}
-          </p>
-        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -143,6 +131,19 @@ export default function StationDetail({
           ))}
         </select>
       </div>
+
+      {parameter === "flow" && conditionInfo && (
+        <p>
+          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${conditionInfo.badgeClass}`}>
+            {conditionInfo.label}
+          </span>
+          {station.currentConditionUpdatedAt && (
+            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
+              as of {formatRelativeTime(station.currentConditionUpdatedAt)}
+            </span>
+          )}
+        </p>
+      )}
 
       {relevantThresholds.length > 0 && (
         <div className="flex flex-wrap gap-3 text-xs">

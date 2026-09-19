@@ -24,64 +24,46 @@ export interface ConditionInfo {
   dotColor: string;
 }
 
-// Every label is prefixed "Flow:" on purpose — this ranking is always about
-// discharge, never water level, and that's easy to misread as applying to
-// whichever number it's displayed next to if it isn't spelled out.
+// No "Flow:" text prefix — callers are responsible for placing this badge
+// somewhere its meaning is obvious from position (next to the Flow rate
+// figure, not floating between it and Water level).
+//
+// Deliberately a 3-color scheme, not one color per ECCC category: red for
+// the two all-time extremes, yellow for the two "much above/below normal"
+// extremes, green for the moderate above/below bands and literal "normal"
+// (labeled "Normal"). Cases where there's simply no ranking to report — not
+// flowing, insufficient history, no discharge data — stay green (none of
+// them are a red or yellow flag) but keep their own honest label instead of
+// being folded into "Normal", which would overclaim that we checked and
+// it's fine.
+const RED = {
+  badgeClass: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  dotColor: "#dc2626",
+};
+const YELLOW = {
+  badgeClass: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  dotColor: "#ca8a04",
+};
+const GREEN = {
+  badgeClass: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  dotColor: "#16a34a",
+};
+
 export const CONDITION_INFO: Record<ConditionCode, ConditionInfo> = {
-  ALL_TIME_HIGH: {
-    label: "Flow: all-time high for this day",
-    badgeClass: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-    dotColor: "#991b1b",
-  },
-  MUCH_ABOVE_NORMAL: {
-    label: "Flow: much above normal",
-    badgeClass: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-    dotColor: "#ea580c",
-  },
-  ABOVE_NORMAL: {
-    label: "Flow: above normal",
-    badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-    dotColor: "#d97706",
-  },
-  NORMAL: {
-    label: "Flow: normal",
-    badgeClass: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-    dotColor: "#16a34a",
-  },
-  BELOW_NORMAL: {
-    label: "Flow: below normal",
-    badgeClass: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
-    dotColor: "#0284c7",
-  },
-  MUCH_BELOW_NORMAL: {
-    label: "Flow: much below normal",
-    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-    dotColor: "#2563eb",
-  },
-  ALL_TIME_LOW: {
-    label: "Flow: all-time low for this day",
-    badgeClass: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
-    dotColor: "#4338ca",
-  },
-  NOT_FLOWING: {
-    label: "Flow: not flowing",
-    badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
-    dotColor: "#78716c",
-  },
-  LACK_OF_STATS: {
-    label: "Flow: not ranked — insufficient historical data",
-    badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
-    dotColor: "#78716c",
-  },
-  NO_DISCHARGE_DATA: {
-    label: "Flow: no discharge data",
-    badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
-    dotColor: "#78716c",
-  },
+  ALL_TIME_HIGH: { label: "All-time high for this day", ...RED },
+  MUCH_ABOVE_NORMAL: { label: "Much above normal", ...YELLOW },
+  ABOVE_NORMAL: { label: "Normal", ...GREEN },
+  NORMAL: { label: "Normal", ...GREEN },
+  BELOW_NORMAL: { label: "Normal", ...GREEN },
+  MUCH_BELOW_NORMAL: { label: "Much below normal", ...YELLOW },
+  ALL_TIME_LOW: { label: "All-time low for this day", ...RED },
+  NOT_FLOWING: { label: "Not flowing", ...GREEN },
+  LACK_OF_STATS: { label: "Not ranked — insufficient data", ...GREEN },
+  NO_DISCHARGE_DATA: { label: "No discharge data", ...GREEN },
 };
 
 const FALLBACK: ConditionInfo = {
-  label: "Flow: unknown",
+  label: "Unknown",
   badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
   dotColor: "#78716c",
 };
