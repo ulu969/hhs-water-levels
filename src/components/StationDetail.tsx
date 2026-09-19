@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import type { Parameter, Resolution, Station, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
-import { getConditionInfo, isOutOfRange } from "@/lib/conditions";
+import { getConditionInfo, isOutOfRange, relevantStatLabel } from "@/lib/conditions";
 
 const RANGES: { value: string; label: string }[] = [
   { value: "24h", label: "Last 24 hours" },
@@ -150,7 +150,10 @@ export default function StationDetail({
               rel="noopener noreferrer"
               className="ml-2 text-xs underline text-black/60 dark:text-white/60"
             >
-              View on ECCC &rarr;
+              View on ECCC
+              {relevantStatLabel(station.currentLevelCondition) &&
+                ` (tick "${relevantStatLabel(station.currentLevelCondition)}")`}{" "}
+              &rarr;
             </a>
           )}
         </p>
@@ -173,7 +176,10 @@ export default function StationDetail({
               rel="noopener noreferrer"
               className="ml-2 text-xs underline text-black/60 dark:text-white/60"
             >
-              View on ECCC &rarr;
+              View on ECCC
+              {relevantStatLabel(station.currentCondition) &&
+                ` (tick "${relevantStatLabel(station.currentCondition)}")`}{" "}
+              &rarr;
             </a>
           )}
         </p>

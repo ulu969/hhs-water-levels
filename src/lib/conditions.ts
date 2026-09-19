@@ -89,6 +89,25 @@ export function isOutOfRange(code: string | null | undefined): boolean {
   return !!code && OUT_OF_RANGE_CODES.has(code);
 }
 
+// ECCC's graph page has checkboxes to overlay historical reference lines
+// (Maximum/Minimum/Upper quartile/Lower quartile/Mean/Median), but confirmed
+// live that ticking one doesn't change the URL at all — they're client-side
+// chart toggles with no linkable query parameter. So this can't be passed
+// in a link; it's surfaced as a one-click nudge in the link text instead,
+// naming whichever reference line is most relevant to the condition that
+// triggered it.
+const RELEVANT_STAT: Partial<Record<ConditionCode, string>> = {
+  ALL_TIME_LOW: "Minimum",
+  MUCH_BELOW_NORMAL: "Lower quartile",
+  MUCH_ABOVE_NORMAL: "Upper quartile",
+  ALL_TIME_HIGH: "Maximum",
+};
+
+export function relevantStatLabel(code: string | null | undefined): string | null {
+  if (!code) return null;
+  return RELEVANT_STAT[code as ConditionCode] ?? null;
+}
+
 export interface PercentileBand {
   p0: number;
   p10: number;
