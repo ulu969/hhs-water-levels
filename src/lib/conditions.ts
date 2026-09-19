@@ -14,7 +14,8 @@ export type ConditionCode =
   | "ALL_TIME_LOW"
   | "NOT_FLOWING"
   | "LACK_OF_STATS"
-  | "NO_DISCHARGE_DATA";
+  | "NO_DISCHARGE_DATA"
+  | "NO_LEVEL_DATA";
 
 export interface ConditionInfo {
   label: string;
@@ -60,6 +61,7 @@ export const CONDITION_INFO: Record<ConditionCode, ConditionInfo> = {
   NOT_FLOWING: { label: "Not flowing", ...GREEN },
   LACK_OF_STATS: { label: "Not ranked — insufficient data", ...GREEN },
   NO_DISCHARGE_DATA: { label: "No discharge data", ...GREEN },
+  NO_LEVEL_DATA: { label: "No water level data", ...GREEN },
 };
 
 const FALLBACK: ConditionInfo = {
@@ -71,4 +73,25 @@ const FALLBACK: ConditionInfo = {
 export function getConditionInfo(code: string | null | undefined): ConditionInfo | null {
   if (!code) return null;
   return CONDITION_INFO[code as ConditionCode] ?? FALLBACK;
+}
+
+export interface PercentileBand {
+  p0: number;
+  p10: number;
+  p90: number;
+  p100: number;
+}
+
+// ECCC doesn't rank water level against history the way it does discharge
+// (see eccc.ts), so this replicates the same percentile-bucket boundaries
+// ECCC's own legend defines, using historical bands fetched separately
+// (see scripts/backfillLevelStats.ts) and today's live reading. Only the
+// four boundary values are needed since the 10th–90th band all render
+// identically ("Normal") anyway.
+export function classifyByPercentile(value: number, band: PercentileBand): ConditionCode {
+  if (value <= band.p0) return "ALL_TIME_LOW";
+  if (value < band.p10) return "MUCH_BELOW_NORMAL";
+  if (value <= band.p90) return "NORMAL";
+  if (value < band.p100) return "MUCH_ABOVE_NORMAL";
+  return "ALL_TIME_HIGH";
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { sql } from "@/lib/db";
 import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
-import { getConditionInfo } from "@/lib/conditions";
+import { classifyByPercentile, getConditionInfo } from "@/lib/conditions";
 import AutoRefresh from "@/components/AutoRefresh";
 import StationMapModal from "@/components/StationMapModal";
 import type { Station } from "@/lib/types";
@@ -23,6 +23,22 @@ interface StationRow {
   flow_value: number | null;
   flow_unit: string | null;
   flow_observed_at: string | null;
+  level_p0: number | null;
+  level_p10: number | null;
+  level_p90: number | null;
+  level_p100: number | null;
+}
+
+function levelConditionCode(s: StationRow): string {
+  if (s.level_value == null || s.level_p0 == null || s.level_p10 == null || s.level_p90 == null || s.level_p100 == null) {
+    return "NO_LEVEL_DATA";
+  }
+  return classifyByPercentile(s.level_value, {
+    p0: s.level_p0,
+    p10: s.level_p10,
+    p90: s.level_p90,
+    p100: s.level_p100,
+  });
 }
 
 async function getLastIngestRun(): Promise<string | null> {
@@ -40,7 +56,8 @@ async function getStations(): Promise<StationRow[]> {
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
       s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
-      flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at
+      flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at,
+      lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100
     FROM stations s
     LEFT JOIN LATERAL (
       SELECT value, unit, observed_at FROM readings
@@ -52,6 +69,9 @@ async function getStations(): Promise<StationRow[]> {
       WHERE station_code = s.code AND parameter = 'flow'
       ORDER BY observed_at DESC LIMIT 1
     ) flow ON true
+    LEFT JOIN level_percentiles lp ON lp.station_code = s.code
+      AND lp.month = EXTRACT(MONTH FROM (now() AT TIME ZONE 'America/Vancouver'))::int
+      AND lp.day = EXTRACT(DAY FROM (now() AT TIME ZONE 'America/Vancouver'))::int
     ORDER BY s.name
   `;
   return rows as unknown as StationRow[];
@@ -73,6 +93,8 @@ export default async function DashboardPage() {
       longitude: s.longitude,
       currentCondition: s.current_condition,
       currentConditionUpdatedAt: s.current_condition_updated_at,
+      currentLevelCondition: levelConditionCode(s),
+      currentLevelConditionUpdatedAt: s.level_observed_at,
     }));
 
   return (
@@ -113,6 +135,7 @@ export default async function DashboardPage() {
                   value={s.level_value}
                   unit={s.level_unit}
                   observedAt={s.level_observed_at}
+                  badge={<ConditionBadge code={levelConditionCode(s)} />}
                 />
                 <Metric
                   label="Flow rate"

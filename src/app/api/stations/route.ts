@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { classifyByPercentile } from "@/lib/conditions";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,8 @@ export async function GET() {
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
       s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
-      flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at
+      flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at,
+      lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100
     FROM stations s
     LEFT JOIN LATERAL (
       SELECT value, unit, observed_at FROM readings
@@ -21,6 +23,9 @@ export async function GET() {
       WHERE station_code = s.code AND parameter = 'flow'
       ORDER BY observed_at DESC LIMIT 1
     ) flow ON true
+    LEFT JOIN level_percentiles lp ON lp.station_code = s.code
+      AND lp.month = EXTRACT(MONTH FROM (now() AT TIME ZONE 'America/Vancouver'))::int
+      AND lp.day = EXTRACT(DAY FROM (now() AT TIME ZONE 'America/Vancouver'))::int
     ORDER BY s.name
   `;
 
@@ -38,6 +43,16 @@ export async function GET() {
     longitude: s.longitude as number | null,
     currentCondition: s.current_condition as string | null,
     currentConditionUpdatedAt: s.current_condition_updated_at as string | null,
+    currentLevelCondition:
+      s.level_value == null || s.level_p0 == null || s.level_p10 == null || s.level_p90 == null || s.level_p100 == null
+        ? "NO_LEVEL_DATA"
+        : classifyByPercentile(s.level_value as number, {
+            p0: s.level_p0 as number,
+            p10: s.level_p10 as number,
+            p90: s.level_p90 as number,
+            p100: s.level_p100 as number,
+          }),
+    currentLevelConditionUpdatedAt: s.level_observed_at as string | null,
     level: s.level_value != null
       ? { value: s.level_value as number, unit: s.level_unit as string, observedAt: s.level_observed_at as string }
       : null,

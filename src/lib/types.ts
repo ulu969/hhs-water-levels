@@ -10,6 +10,8 @@ export interface Station {
   longitude: number | null;
   currentCondition: string | null;
   currentConditionUpdatedAt: string | null;
+  currentLevelCondition: string | null;
+  currentLevelConditionUpdatedAt: string | null;
 }
 
 export interface Reading {

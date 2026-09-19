@@ -82,7 +82,8 @@ export default function StationDetail({
   );
 
   const unit = readings[0]?.unit ?? (parameter === "level" ? "m" : "m³/s");
-  const conditionInfo = getConditionInfo(station.currentCondition);
+  const flowConditionInfo = getConditionInfo(station.currentCondition);
+  const levelConditionInfo = getConditionInfo(station.currentLevelCondition);
 
   const chartData = useMemo(
     () =>
@@ -132,10 +133,23 @@ export default function StationDetail({
         </select>
       </div>
 
-      {parameter === "flow" && conditionInfo && (
+      {parameter === "level" && levelConditionInfo && (
         <p>
-          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${conditionInfo.badgeClass}`}>
-            {conditionInfo.label}
+          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${levelConditionInfo.badgeClass}`}>
+            {levelConditionInfo.label}
+          </span>
+          {station.currentLevelConditionUpdatedAt && (
+            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
+              as of {formatRelativeTime(station.currentLevelConditionUpdatedAt)}
+            </span>
+          )}
+        </p>
+      )}
+
+      {parameter === "flow" && flowConditionInfo && (
+        <p>
+          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${flowConditionInfo.badgeClass}`}>
+            {flowConditionInfo.label}
           </span>
           {station.currentConditionUpdatedAt && (
             <span className="ml-2 text-xs text-black/40 dark:text-white/40">
