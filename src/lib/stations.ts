@@ -13,4 +13,5 @@ export const STATION_CODES = [
   "08MF035", // Fraser River near Agassiz
   "08MF038", // Fraser River at Cannor
   "08MF005", // Fraser River at Hope
+  "08MF068", // Coquihalla River above Alexander Creek
 ] as const;
