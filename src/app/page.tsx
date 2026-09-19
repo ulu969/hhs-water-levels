@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
-import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
+import { INGEST_INTERVAL_MINUTES, todayInBC } from "@/lib/config";
 import { classifyByPercentile, getConditionInfo } from "@/lib/conditions";
 import AutoRefresh from "@/components/AutoRefresh";
 import StationMapModal from "@/components/StationMapModal";
@@ -51,6 +51,7 @@ async function getLastIngestRun(): Promise<string | null> {
 }
 
 async function getStations(): Promise<StationRow[]> {
+  const { month, day } = todayInBC();
   const rows = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
@@ -70,8 +71,7 @@ async function getStations(): Promise<StationRow[]> {
       ORDER BY observed_at DESC LIMIT 1
     ) flow ON true
     LEFT JOIN level_percentiles lp ON lp.station_code = s.code
-      AND lp.month = EXTRACT(MONTH FROM (now() AT TIME ZONE 'America/Vancouver'))::int
-      AND lp.day = EXTRACT(DAY FROM (now() AT TIME ZONE 'America/Vancouver'))::int
+      AND lp.month = ${month} AND lp.day = ${day}
     ORDER BY s.name
   `;
   return rows as unknown as StationRow[];

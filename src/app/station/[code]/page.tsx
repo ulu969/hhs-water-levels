@@ -2,11 +2,13 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import StationDetail from "@/components/StationDetail";
 import { classifyByPercentile } from "@/lib/conditions";
+import { todayInBC } from "@/lib/config";
 import type { Station, StationRecord, Threshold } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 async function getStation(code: string): Promise<Station | null> {
+  const { month, day } = todayInBC();
   const rows = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
@@ -20,8 +22,7 @@ async function getStation(code: string): Promise<Station | null> {
       ORDER BY observed_at DESC LIMIT 1
     ) lvl ON true
     LEFT JOIN level_percentiles lp ON lp.station_code = s.code
-      AND lp.month = EXTRACT(MONTH FROM (now() AT TIME ZONE 'America/Vancouver'))::int
-      AND lp.day = EXTRACT(DAY FROM (now() AT TIME ZONE 'America/Vancouver'))::int
+      AND lp.month = ${month} AND lp.day = ${day}
     WHERE s.code = ${code}
   `;
   if (rows.length === 0) return null;

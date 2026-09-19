@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { classifyByPercentile } from "@/lib/conditions";
+import { todayInBC } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const { month, day } = todayInBC();
   const stations = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
@@ -24,8 +26,7 @@ export async function GET() {
       ORDER BY observed_at DESC LIMIT 1
     ) flow ON true
     LEFT JOIN level_percentiles lp ON lp.station_code = s.code
-      AND lp.month = EXTRACT(MONTH FROM (now() AT TIME ZONE 'America/Vancouver'))::int
-      AND lp.day = EXTRACT(DAY FROM (now() AT TIME ZONE 'America/Vancouver'))::int
+      AND lp.month = ${month} AND lp.day = ${day}
     ORDER BY s.name
   `;
 
