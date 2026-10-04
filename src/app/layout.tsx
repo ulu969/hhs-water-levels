@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import SiteHeader from "@/components/SiteHeader";
+import { sql } from "@/lib/db";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,23 +20,30 @@ export const metadata: Metadata = {
     "Real-time water level and flow data for the lakes and rivers around Harrison Hot Springs, BC.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export const dynamic = "force-dynamic";
+
+async function getNavigationStations() {
+  const rows = await sql`
+    SELECT code, name
+    FROM stations
+    ORDER BY name
+  `;
+  return rows.map((row) => ({
+    code: row.code as string,
+    name: row.name as string,
+  }));
+}
+
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const stations = await getNavigationStations();
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-black/10 dark:border-white/10">
-          <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-            <Link href="/" className="font-semibold tracking-tight">
-              Harrison Water Levels
-            </Link>
-            <span className="text-xs text-black/50 dark:text-white/50">
-              Data: Environment and Climate Change Canada
-            </span>
-          </div>
-        </header>
+        <SiteHeader stations={stations} />
         <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">
           {children}
         </main>

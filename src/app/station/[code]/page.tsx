@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import StationDetail from "@/components/StationDetail";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { classifyByPercentile } from "@/lib/conditions";
 import { todayInBC } from "@/lib/config";
 import type { Station, StationRecord, Threshold } from "@/lib/types";
@@ -90,5 +91,10 @@ export default async function StationPage({
 
   const [thresholds, records] = await Promise.all([getThresholds(code), getRecords(code)]);
 
-  return <StationDetail station={station} thresholds={thresholds} records={records} />;
+  return (
+    <>
+      <Breadcrumbs current={station.name} />
+      <StationDetail station={station} thresholds={thresholds} records={records} />
+    </>
+  );
 }

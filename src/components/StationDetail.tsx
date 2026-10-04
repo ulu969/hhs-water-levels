@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
-import { getConditionInfo, isOutOfRange, relevantStatLabel } from "@/lib/conditions";
+import { getConditionInfo, relevantStatLabel } from "@/lib/conditions";
 
 const RANGES: { value: string; label: string }[] = [
   { value: "24h", label: "Last 24 hours" },
@@ -38,7 +38,7 @@ export default function StationDetail({
   records: StationRecord[];
 }) {
   const [parameter, setParameter] = useState<Parameter>("level");
-  const [range, setRange] = useState("24h");
+  const [range, setRange] = useState("1y");
   const [view, setView] = useState<"chart" | "table">("chart");
   const [loaded, setLoaded] = useState<{
     key: string;
@@ -137,29 +137,29 @@ export default function StationDetail({
         </select>
       </div>
 
-      {parameter === "level" && levelConditionInfo && (
+      {parameter === "level" && (
         <p>
-          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${levelConditionInfo.badgeClass}`}>
-            {levelConditionInfo.label}
-          </span>
+          {levelConditionInfo && (
+            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${levelConditionInfo.badgeClass}`}>
+              {levelConditionInfo.label}
+            </span>
+          )}
           {station.currentLevelConditionUpdatedAt && (
             <span className="ml-2 text-xs text-black/40 dark:text-white/40">
               as of {formatRelativeTime(station.currentLevelConditionUpdatedAt)}
             </span>
           )}
-          {isOutOfRange(station.currentLevelCondition) && (
-            <a
-              href={ecccReportUrl(station.code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 text-xs underline text-black/60 dark:text-white/60"
-            >
-              View on ECCC
-              {relevantStatLabel(station.currentLevelCondition) &&
-                ` (tick "${relevantStatLabel(station.currentLevelCondition)}")`}{" "}
-              &rarr;
-            </a>
-          )}
+          <a
+            href={ecccReportUrl(station.code)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+          >
+            View on ECCC
+            {relevantStatLabel(station.currentLevelCondition) &&
+              ` (tick "${relevantStatLabel(station.currentLevelCondition)}")`}{" "}
+            &rarr;
+          </a>
         </p>
       )}
       {parameter === "level" && levelRecord && (
@@ -169,29 +169,29 @@ export default function StationDetail({
         </p>
       )}
 
-      {parameter === "flow" && flowConditionInfo && (
+      {parameter === "flow" && (
         <p>
-          <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${flowConditionInfo.badgeClass}`}>
-            {flowConditionInfo.label}
-          </span>
+          {flowConditionInfo && (
+            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${flowConditionInfo.badgeClass}`}>
+              {flowConditionInfo.label}
+            </span>
+          )}
           {station.currentConditionUpdatedAt && (
             <span className="ml-2 text-xs text-black/40 dark:text-white/40">
               as of {formatRelativeTime(station.currentConditionUpdatedAt)}
             </span>
           )}
-          {isOutOfRange(station.currentCondition) && (
-            <a
-              href={ecccReportUrl(station.code)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 text-xs underline text-black/60 dark:text-white/60"
-            >
-              View on ECCC
-              {relevantStatLabel(station.currentCondition) &&
-                ` (tick "${relevantStatLabel(station.currentCondition)}")`}{" "}
-              &rarr;
-            </a>
-          )}
+          <a
+            href={ecccReportUrl(station.code)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+          >
+            View on ECCC
+            {relevantStatLabel(station.currentCondition) &&
+              ` (tick "${relevantStatLabel(station.currentCondition)}")`}{" "}
+            &rarr;
+          </a>
         </p>
       )}
       {parameter === "flow" && flowRecord && (
