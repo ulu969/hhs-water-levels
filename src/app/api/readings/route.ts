@@ -44,8 +44,7 @@ export async function GET(req: NextRequest) {
     try {
       const dailyMeans = await fetchDailyMeanReadings(station, parameter, startDate, endDate);
       if (dailyMeans.length > 0) {
-        const historicalByDay =
-          parameter === "level" ? await fetchHistoricalReferenceByDay(station) : new Map();
+        const historicalByDay = await fetchHistoricalReferenceByDay(station, parameter);
 
         return NextResponse.json({
           resolution: config.resolution,
@@ -80,17 +79,22 @@ export async function GET(req: NextRequest) {
         r.observed_at AS bucket,
         r.value,
         r.unit,
-        lp.p0 AS historical_min,
-        lp.p100 AS historical_max,
-        lp.p0_observed_at AS historical_min_date,
-        lp.p100_observed_at AS historical_max_date,
-        lp.record_through_year AS historical_through_year
+        COALESCE(lp.p0, fp.p0) AS historical_min,
+        COALESCE(lp.p100, fp.p100) AS historical_max,
+        COALESCE(lp.p0_observed_at, fp.p0_observed_at) AS historical_min_date,
+        COALESCE(lp.p100_observed_at, fp.p100_observed_at) AS historical_max_date,
+        COALESCE(lp.record_through_year, fp.record_through_year) AS historical_through_year
       FROM readings r
       LEFT JOIN level_percentiles lp
         ON r.parameter = 'level'
         AND lp.station_code = r.station_code
         AND lp.month = EXTRACT(MONTH FROM r.observed_at)::int
         AND lp.day = EXTRACT(DAY FROM r.observed_at)::int
+      LEFT JOIN flow_percentiles fp
+        ON r.parameter = 'flow'
+        AND fp.station_code = r.station_code
+        AND fp.month = EXTRACT(MONTH FROM r.observed_at)::int
+        AND fp.day = EXTRACT(DAY FROM r.observed_at)::int
       WHERE r.station_code = ${station}
         AND r.parameter = ${parameter}
         AND r.observed_at >= now() - ${config.interval}::interval
@@ -105,17 +109,22 @@ export async function GET(req: NextRequest) {
         min(value) AS min_value,
         max(value) AS max_value,
         max(unit) AS unit,
-        max(lp.p0) AS historical_min,
-        max(lp.p100) AS historical_max,
-        max(lp.p0_observed_at) AS historical_min_date,
-        max(lp.p100_observed_at) AS historical_max_date,
-        max(lp.record_through_year) AS historical_through_year
+        COALESCE(max(lp.p0), max(fp.p0)) AS historical_min,
+        COALESCE(max(lp.p100), max(fp.p100)) AS historical_max,
+        COALESCE(max(lp.p0_observed_at), max(fp.p0_observed_at)) AS historical_min_date,
+        COALESCE(max(lp.p100_observed_at), max(fp.p100_observed_at)) AS historical_max_date,
+        COALESCE(max(lp.record_through_year), max(fp.record_through_year)) AS historical_through_year
       FROM readings r
       LEFT JOIN level_percentiles lp
         ON r.parameter = 'level'
         AND lp.station_code = r.station_code
         AND lp.month = EXTRACT(MONTH FROM r.observed_at)::int
         AND lp.day = EXTRACT(DAY FROM r.observed_at)::int
+      LEFT JOIN flow_percentiles fp
+        ON r.parameter = 'flow'
+        AND fp.station_code = r.station_code
+        AND fp.month = EXTRACT(MONTH FROM r.observed_at)::int
+        AND fp.day = EXTRACT(DAY FROM r.observed_at)::int
       WHERE r.station_code = ${station}
         AND r.parameter = ${parameter}
         AND r.observed_at >= now() - ${config.interval}::interval
@@ -151,20 +160,21 @@ interface HistoricalReference {
 }
 
 async function fetchHistoricalReferenceByDay(
-  station: string
+  station: string,
+  parameter: Parameter
 ): Promise<Map<string, HistoricalReference>> {
-  const rows = await sql`
-    SELECT
-      month,
-      day,
-      p0,
-      p100,
-      p0_observed_at,
-      p100_observed_at,
-      record_through_year
-    FROM level_percentiles
-    WHERE station_code = ${station}
-  `;
+  const rows =
+    parameter === "level"
+      ? await sql`
+          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at, record_through_year
+          FROM level_percentiles
+          WHERE station_code = ${station}
+        `
+      : await sql`
+          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at, record_through_year
+          FROM flow_percentiles
+          WHERE station_code = ${station}
+        `;
 
   return new Map(
     rows.map((row) => [

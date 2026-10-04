@@ -98,9 +98,10 @@ export default function StationDetail({
   const flowRecord = relevantRecord(records, "flow", station.currentCondition);
   const historicalMaxAvailable = readings.some((r) => r.historicalMax != null);
   const historicalMinAvailable = readings.some((r) => r.historicalMin != null);
-  const provisionalRecordReadings = readings.filter(
-    (r) => r.historicalMax != null && r.value > r.historicalMax
-  );
+  const provisionalRecordReadings =
+    resolution === "daily"
+      ? readings.filter((r) => r.historicalMax != null && r.value > r.historicalMax)
+      : [];
   const historicalThroughYear = readings.find(
     (r) => r.historicalThroughYear != null
   )?.historicalThroughYear;
@@ -235,7 +236,7 @@ export default function StationDetail({
         </div>
       )}
 
-      {parameter === "level" && view === "chart" && (
+      {view === "chart" && (
         <fieldset className="flex flex-wrap items-center gap-2 text-sm sm:gap-x-4">
           <legend className="sr-only">Published historical daily statistics</legend>
           <span className="shrink-0 text-xs text-black/55 dark:text-white/55 sm:text-sm">
@@ -258,7 +259,7 @@ export default function StationDetail({
         </fieldset>
       )}
 
-      {parameter === "level" && status === "ready" && provisionalRecordReadings.length > 0 && (
+      {status === "ready" && provisionalRecordReadings.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 font-medium text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200">
             Provisional new record
@@ -456,8 +457,8 @@ function chartSeriesLabel(name: string, parameter: Parameter, point: ReadingPoin
   if (name === "historicalMin") {
     return `Published minimum${formatReferenceYear(point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMinDate)}`;
   }
-  if (parameter === "level" && point.historicalMax != null && point.value > point.historicalMax) {
-    return "Water level — Provisional new record";
+  if (point.historicalMax != null && point.value > point.historicalMax) {
+    return `${parameter === "level" ? "Water level" : "Flow rate"} — Provisional new record`;
   }
   return parameter === "level" ? "Water level" : "Flow rate";
 }
