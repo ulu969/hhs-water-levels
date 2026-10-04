@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   CartesianGrid,
   Line,
@@ -26,6 +26,11 @@ interface ReadingPoint {
   observedAt: string;
   value: number;
   unit: string;
+  historicalMin?: number;
+  historicalMax?: number;
+  historicalMinDate?: string | null;
+  historicalMaxDate?: string | null;
+  historicalThroughYear?: number | null;
 }
 
 export default function StationDetail({
@@ -40,6 +45,9 @@ export default function StationDetail({
   const [parameter, setParameter] = useState<Parameter>("level");
   const [range, setRange] = useState("1y");
   const [view, setView] = useState<"chart" | "table">("chart");
+  const [showHistoricalMax, setShowHistoricalMax] = useState(false);
+  const [showHistoricalMin, setShowHistoricalMin] = useState(false);
+  const [mobileTooltipTarget, setMobileTooltipTarget] = useState<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState<{
     key: string;
     resolution: Resolution;
@@ -88,6 +96,19 @@ export default function StationDetail({
   const levelConditionInfo = getConditionInfo(station.currentLevelCondition);
   const levelRecord = relevantRecord(records, "level", station.currentLevelCondition);
   const flowRecord = relevantRecord(records, "flow", station.currentCondition);
+  const historicalMaxAvailable = readings.some((r) => r.historicalMax != null);
+  const historicalMinAvailable = readings.some((r) => r.historicalMin != null);
+  const provisionalRecordReadings = readings.filter(
+    (r) => r.historicalMax != null && r.value > r.historicalMax
+  );
+  const historicalThroughYear = readings.find(
+    (r) => r.historicalThroughYear != null
+  )?.historicalThroughYear;
+  const isSmallScreen = useSyncExternalStore(
+    subscribeToSmallScreen,
+    getSmallScreenSnapshot,
+    getServerScreenSnapshot
+  );
 
   const chartData = useMemo(
     () =>
@@ -214,6 +235,42 @@ export default function StationDetail({
         </div>
       )}
 
+      {parameter === "level" && view === "chart" && (
+        <fieldset className="flex flex-wrap items-center gap-2 text-sm sm:gap-x-4">
+          <legend className="sr-only">Published historical daily statistics</legend>
+          <span className="shrink-0 text-xs text-black/55 dark:text-white/55 sm:text-sm">
+            Published history:
+          </span>
+          <HistoricalToggle
+            label="Maximum"
+            variant="maximum"
+            checked={showHistoricalMax}
+            disabled={status !== "ready" || !historicalMaxAvailable}
+            onChange={setShowHistoricalMax}
+          />
+          <HistoricalToggle
+            label="Minimum"
+            variant="minimum"
+            checked={showHistoricalMin}
+            disabled={status !== "ready" || !historicalMinAvailable}
+            onChange={setShowHistoricalMin}
+          />
+        </fieldset>
+      )}
+
+      {parameter === "level" && status === "ready" && provisionalRecordReadings.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 font-medium text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200">
+            Provisional new record
+          </span>
+          <span className="text-black/55 dark:text-white/55">
+            {provisionalRecordReadings.length} provisional daily mean
+            {provisionalRecordReadings.length === 1 ? " exceeds" : "s exceed"} the published
+            maximum{historicalThroughYear ? ` through ${historicalThroughYear}` : ""}.
+          </span>
+        </div>
+      )}
+
       {status === "loading" && (
         <p className="text-sm text-black/50 dark:text-white/50">Loading readings&hellip;</p>
       )}
@@ -226,6 +283,15 @@ export default function StationDetail({
         <p className="text-sm text-black/50 dark:text-white/50">
           No readings available for this range yet.
         </p>
+      )}
+
+      {status === "ready" && readings.length > 0 && view === "chart" && isSmallScreen && (
+        <div className="min-h-28 rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03] sm:hidden">
+          <p className="mb-2 text-xs text-black/45 dark:text-white/45">
+            Chart details &middot; tap or drag across the graph
+          </p>
+          <div ref={setMobileTooltipTarget} className="relative min-h-20" aria-live="polite" />
+        </div>
       )}
 
       {status === "ready" && readings.length > 0 && view === "chart" && (
@@ -246,8 +312,26 @@ export default function StationDetail({
                 label={{ value: unit, angle: -90, position: "insideLeft", fontSize: 12 }}
               />
               <Tooltip
-                labelFormatter={(t) => formatTimestamp(new Date(t as number).toISOString())}
-                formatter={(value) => [formatValue(Number(value), unit), parameter === "level" ? "Level" : "Flow"]}
+                portal={isSmallScreen ? mobileTooltipTarget : undefined}
+                position={isSmallScreen ? { x: 0, y: 0 } : undefined}
+                active={isSmallScreen && !mobileTooltipTarget ? false : undefined}
+                wrapperStyle={isSmallScreen ? { width: "100%", zIndex: 10 } : undefined}
+                contentStyle={
+                  isSmallScreen
+                    ? {
+                        width: "100%",
+                        minHeight: "5rem",
+                        whiteSpace: "normal",
+                        border: "none",
+                        background: "var(--background)",
+                      }
+                    : undefined
+                }
+                labelFormatter={(t) => formatChartTooltipLabel(Number(t), resolution)}
+                formatter={(value, name, item) => [
+                  formatValue(Number(value), unit),
+                  chartSeriesLabel(String(name), parameter, item.payload as ReadingPoint),
+                ]}
               />
               {relevantThresholds.map((t) => (
                 <ReferenceLine
@@ -258,9 +342,35 @@ export default function StationDetail({
                   label={{ value: t.label, fontSize: 11, position: "insideTopRight" }}
                 />
               ))}
+              {showHistoricalMax && historicalMaxAvailable && (
+                <Line
+                  type="monotone"
+                  dataKey="historicalMax"
+                  name="historicalMax"
+                  stroke="#ea580c"
+                  strokeWidth={2.5}
+                  dot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              )}
+              {showHistoricalMin && historicalMinAvailable && (
+                <Line
+                  type="monotone"
+                  dataKey="historicalMin"
+                  name="historicalMin"
+                  stroke="#7c3aed"
+                  strokeWidth={1.5}
+                  strokeDasharray="6 4"
+                  dot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              )}
               <Line
                 type="monotone"
                 dataKey="value"
+                name="value"
                 stroke="#2563eb"
                 strokeWidth={2}
                 dot={false}
@@ -324,6 +434,104 @@ function formatAxisTick(timestamp: number, resolution: Resolution): string {
     return date.toLocaleString("en-CA", { month: "short", day: "numeric", hour: "2-digit" });
   }
   return date.toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+}
+
+function formatChartTooltipLabel(timestamp: number, resolution: Resolution): string {
+  const date = new Date(timestamp);
+  if (resolution === "daily" || resolution === "monthly") {
+    return date.toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return formatTimestamp(date.toISOString());
+}
+
+function chartSeriesLabel(name: string, parameter: Parameter, point: ReadingPoint): string {
+  if (name === "historicalMax") {
+    return `Published maximum${formatReferenceYear(point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMaxDate)}`;
+  }
+  if (name === "historicalMin") {
+    return `Published minimum${formatReferenceYear(point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMinDate)}`;
+  }
+  if (parameter === "level" && point.historicalMax != null && point.value > point.historicalMax) {
+    return "Water level — Provisional new record";
+  }
+  return parameter === "level" ? "Water level" : "Flow rate";
+}
+
+function formatReferenceYear(year: number | null | undefined): string {
+  return year ? ` (through ${year})` : "";
+}
+
+function formatOccurrenceDate(date: string | null | undefined): string {
+  if (!date) return "";
+  const formatted = new Date(`${date.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  return ` — occurred ${formatted}`;
+}
+
+function subscribeToSmallScreen(callback: () => void): () => void {
+  const query = window.matchMedia("(max-width: 639px)");
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+
+function getSmallScreenSnapshot(): boolean {
+  return window.matchMedia("(max-width: 639px)").matches;
+}
+
+function getServerScreenSnapshot(): boolean {
+  return false;
+}
+
+function HistoricalToggle({
+  label,
+  variant,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  variant: "maximum" | "minimum";
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={`flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1 text-xs transition-colors sm:min-h-10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm ${
+        disabled
+          ? "border-black/10 text-black/30 dark:border-white/10 dark:text-white/30"
+          : "border-black/15 text-black/70 hover:border-black/30 dark:border-white/15 dark:text-white/70 dark:hover:border-white/30"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
+          variant === "maximum" ? "accent-orange-600" : "accent-violet-700"
+        }`}
+      />
+      <span
+        aria-hidden="true"
+        className={`w-4 border-t-2 sm:w-6 ${
+          variant === "maximum"
+            ? "border-orange-600"
+            : "border-dashed border-violet-700 dark:border-violet-400"
+        }`}
+      />
+      {label}
+    </label>
+  );
 }
 
 function ToggleGroup({

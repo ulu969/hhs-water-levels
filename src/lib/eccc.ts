@@ -4,6 +4,8 @@ const BASE_URL = "https://wateroffice.ec.gc.ca/services";
 
 // ECCC parameter codes: 46 = water level (m), 47 = discharge/flow (m³/s).
 const PARAMETER_CODES: Record<string, { parameter: Parameter; unit: string }> = {
+  "3": { parameter: "level", unit: "m" },
+  "6": { parameter: "flow", unit: "m³/s" },
   "46": { parameter: "level", unit: "m" },
   "47": { parameter: "flow", unit: "m³/s" },
 };
@@ -87,6 +89,30 @@ export async function fetchHistoricalReadings(
 
   const csv = await res.text();
   return parseCsv(csv);
+}
+
+// Fetches ECCC's own provisional daily means. These should be preferred over
+// locally averaging unit readings for long-range charts because ECCC applies
+// the official hydrometric-day boundary and daily-mean calculation.
+export async function fetchDailyMeanReadings(
+  stationCode: string,
+  parameter: Parameter,
+  startDate: Date,
+  endDate: Date
+): Promise<FetchedReading[]> {
+  const params = new URLSearchParams();
+  params.append("stations[]", stationCode);
+  params.append("parameters[]", parameter === "level" ? "3" : "6");
+  params.append("start_date", formatEcccDate(startDate));
+  params.append("end_date", formatEcccDate(endDate));
+
+  const url = `${BASE_URL}/real_time_data/csv/inline?${params.toString()}`;
+  const res = await fetch(url, { next: { revalidate: 3600 } });
+  if (!res.ok) {
+    throw new Error(`ECCC daily mean request failed: ${res.status}`);
+  }
+
+  return parseCsv(await res.text());
 }
 
 function formatEcccDate(date: Date): string {
