@@ -157,9 +157,15 @@ function ConditionBadge({ code }: { code: string | null }) {
   const info = getConditionInfo(code);
   if (!info) return null;
 
+  const isNoData = code === "NO_LEVEL_DATA" || code === "NO_DISCHARGE_DATA";
+
   return (
     <span
-      className={`inline-block mt-2 rounded-full px-2 py-0.5 text-xs ${info.badgeClass}`}
+      className={`inline-block mt-2 rounded-full px-2 py-0.5 text-xs ${
+        isNoData
+          ? "border border-dashed border-black/25 bg-black/5 text-black/55 dark:border-white/25 dark:bg-white/5 dark:text-white/55"
+          : info.badgeClass
+      }`}
     >
       {info.label}
     </span>
