@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import {
   CartesianGrid,
   Line,
@@ -30,6 +31,7 @@ interface ReadingPoint {
   historicalMax?: number;
   historicalMinDate?: string | null;
   historicalMaxDate?: string | null;
+  historicalStartYear?: number | null;
   historicalThroughYear?: number | null;
 }
 
@@ -37,12 +39,18 @@ export default function StationDetail({
   station,
   thresholds,
   records,
+  hasLevelData,
+  hasFlowData,
 }: {
   station: Station;
   thresholds: Threshold[];
   records: StationRecord[];
+  hasLevelData: boolean;
+  hasFlowData: boolean;
 }) {
-  const [parameter, setParameter] = useState<Parameter>("level");
+  const [parameter, setParameter] = useState<Parameter>(
+    !hasLevelData && hasFlowData ? "flow" : "level"
+  );
   const [range, setRange] = useState("1y");
   const [view, setView] = useState<"chart" | "table">("chart");
   const [showHistoricalMax, setShowHistoricalMax] = useState(false);
@@ -94,13 +102,21 @@ export default function StationDetail({
   const unit = readings[0]?.unit ?? (parameter === "level" ? "m" : "m³/s");
   const flowConditionInfo = getConditionInfo(station.currentCondition);
   const levelConditionInfo = getConditionInfo(station.currentLevelCondition);
-  const levelRecord = relevantRecord(records, "level", station.currentLevelCondition);
-  const flowRecord = relevantRecord(records, "flow", station.currentCondition);
+  const recordGroups = (["level", "flow"] as const)
+    .map((recordParameter) => ({
+      parameter: recordParameter,
+      records: records.filter((record) => record.parameter === recordParameter),
+    }))
+    .filter((group) => group.records.length > 0);
   const historicalMaxAvailable = readings.some((r) => r.historicalMax != null);
   const historicalMinAvailable = readings.some((r) => r.historicalMin != null);
-  const provisionalRecordReadings =
+  const provisionalHighReadings =
     resolution === "daily"
       ? readings.filter((r) => r.historicalMax != null && r.value > r.historicalMax)
+      : [];
+  const provisionalLowReadings =
+    resolution === "daily"
+      ? readings.filter((r) => r.historicalMin != null && r.value < r.historicalMin)
       : [];
   const historicalThroughYear = readings.find(
     (r) => r.historicalThroughYear != null
@@ -122,11 +138,32 @@ export default function StationDetail({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">{station.name}</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
-          {station.waterbody} &middot; Station {station.code}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold">{station.name}</h1>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {station.waterbody} &middot; Station {station.code}
+          </p>
+        </div>
+        {station.latitude != null && station.longitude != null && (
+          <Link
+            href={{ pathname: "/map", query: { station: station.code } }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-black/15 px-3 py-1.5 text-sm transition-colors hover:border-black/30 dark:border-white/15 dark:hover:border-white/30"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="size-4"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z" />
+              <circle cx="12" cy="10" r="2.25" />
+            </svg>
+            Show on map
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -184,13 +221,6 @@ export default function StationDetail({
           </a>
         </p>
       )}
-      {parameter === "level" && levelRecord && (
-        <p className="text-xs text-black/50 dark:text-white/50">
-          Previous record: {formatValue(levelRecord.value, "m")} on{" "}
-          {formatTimestamp(levelRecord.observedAt)}
-        </p>
-      )}
-
       {parameter === "flow" && (
         <p>
           {flowConditionInfo && (
@@ -216,11 +246,33 @@ export default function StationDetail({
           </a>
         </p>
       )}
-      {parameter === "flow" && flowRecord && (
-        <p className="text-xs text-black/50 dark:text-white/50">
-          Previous record: {formatValue(flowRecord.value, "m³/s")} on{" "}
-          {formatTimestamp(flowRecord.observedAt)}
-        </p>
+      {recordGroups.length > 0 && (
+        <section
+          aria-labelledby="all-time-records-heading"
+          className="rounded-lg border border-black/10 p-4 dark:border-white/10"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="all-time-records-heading" className="text-sm font-semibold">
+              All-time records
+            </h2>
+            <Link
+              href="/historical-values"
+              className="inline-flex items-center gap-1 rounded-full border border-black/15 px-2.5 py-1 text-xs text-black/60 transition-colors hover:border-black/30 hover:text-black dark:border-white/15 dark:text-white/60 dark:hover:border-white/30 dark:hover:text-white"
+            >
+              Why these values can differ
+              <span aria-hidden="true">?</span>
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {recordGroups.map((group) => (
+              <RecordGroup
+                key={group.parameter}
+                parameter={group.parameter}
+                records={group.records}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {relevantThresholds.length > 0 && (
@@ -259,15 +311,18 @@ export default function StationDetail({
         </fieldset>
       )}
 
-      {status === "ready" && provisionalRecordReadings.length > 0 && (
+      {status === "ready" &&
+        (provisionalHighReadings.length > 0 || provisionalLowReadings.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 font-medium text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200">
             Provisional new record
           </span>
           <span className="text-black/55 dark:text-white/55">
-            {provisionalRecordReadings.length} provisional daily mean
-            {provisionalRecordReadings.length === 1 ? " exceeds" : "s exceed"} the published
-            maximum{historicalThroughYear ? ` through ${historicalThroughYear}` : ""}.
+            {formatProvisionalRecordSummary(
+              provisionalLowReadings.length,
+              provisionalHighReadings.length,
+              historicalThroughYear
+            )}
           </span>
         </div>
       )}
@@ -408,17 +463,50 @@ export default function StationDetail({
   );
 }
 
-// Only meaningful for the two all-time codes — the yellow "much above/below"
-// tier isn't tied to a single record, just a percentile boundary (that's
-// what the ECCC link's "tick ... quartile" hint is for instead).
-function relevantRecord(
-  records: StationRecord[],
-  parameter: Parameter,
-  condition: string | null
-): StationRecord | null {
-  const recordType = condition === "ALL_TIME_LOW" ? "minimum" : condition === "ALL_TIME_HIGH" ? "maximum" : null;
-  if (!recordType) return null;
-  return records.find((r) => r.parameter === parameter && r.recordType === recordType) ?? null;
+function RecordGroup({
+  parameter,
+  records,
+}: {
+  parameter: Parameter;
+  records: StationRecord[];
+}) {
+  const unit = parameter === "level" ? "m" : "m³/s";
+  const label = parameter === "level" ? "Water level" : "Flow rate";
+
+  return (
+    <div>
+      <h3 className="text-xs font-medium text-black/60 dark:text-white/60">{label}</h3>
+      <dl className="mt-2 grid grid-cols-2 gap-2">
+        {(["minimum", "maximum"] as const).map((recordType) => {
+          const record = records.find((item) => item.recordType === recordType);
+          if (!record) return null;
+
+          return (
+            <div key={recordType} className="rounded-md bg-black/[0.03] p-3 dark:bg-white/[0.05]">
+              <dt className="text-xs capitalize text-black/50 dark:text-white/50">
+                {recordType}
+              </dt>
+              <dd className="mt-1 text-sm font-medium tabular-nums">
+                {formatValue(record.value, unit)}
+              </dd>
+              <dd className="mt-0.5 text-xs text-black/50 dark:text-white/50">
+                {formatRecordDate(record.observedAt)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
+function formatRecordDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Vancouver",
+  });
 }
 
 function ecccReportUrl(stationCode: string): string {
@@ -452,19 +540,49 @@ function formatChartTooltipLabel(timestamp: number, resolution: Resolution): str
 
 function chartSeriesLabel(name: string, parameter: Parameter, point: ReadingPoint): string {
   if (name === "historicalMax") {
-    return `Published maximum${formatReferenceYear(point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMaxDate)}`;
+    return `Published maximum${formatReferenceYears(point.historicalStartYear, point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMaxDate)}`;
   }
   if (name === "historicalMin") {
-    return `Published minimum${formatReferenceYear(point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMinDate)}`;
+    return `Published minimum${formatReferenceYears(point.historicalStartYear, point.historicalThroughYear)}${formatOccurrenceDate(point.historicalMinDate)}`;
   }
   if (point.historicalMax != null && point.value > point.historicalMax) {
-    return `${parameter === "level" ? "Water level" : "Flow rate"} — Provisional new record`;
+    return `${parameter === "level" ? "Water level" : "Flow rate"} — Provisional new record high`;
+  }
+  if (point.historicalMin != null && point.value < point.historicalMin) {
+    return `${parameter === "level" ? "Water level" : "Flow rate"} — Provisional new record low`;
   }
   return parameter === "level" ? "Water level" : "Flow rate";
 }
 
-function formatReferenceYear(year: number | null | undefined): string {
-  return year ? ` (through ${year})` : "";
+function formatProvisionalRecordSummary(
+  lowCount: number,
+  highCount: number,
+  historicalThroughYear: number | null | undefined
+): string {
+  const referencePeriod = historicalThroughYear ? ` through ${historicalThroughYear}` : "";
+  const summaries: string[] = [];
+
+  if (lowCount > 0) {
+    summaries.push(
+      `${lowCount} provisional daily mean${lowCount === 1 ? " falls" : "s fall"} below the published minimum${referencePeriod}`
+    );
+  }
+  if (highCount > 0) {
+    summaries.push(
+      `${highCount} provisional daily mean${highCount === 1 ? " exceeds" : "s exceed"} the published maximum${referencePeriod}`
+    );
+  }
+
+  return `${summaries.join("; ")}.`;
+}
+
+function formatReferenceYears(
+  startYear: number | null | undefined,
+  throughYear: number | null | undefined
+): string {
+  if (startYear && throughYear) return ` (${startYear} through ${throughYear})`;
+  if (throughYear) return ` (through ${throughYear})`;
+  return "";
 }
 
 function formatOccurrenceDate(date: string | null | undefined): string {

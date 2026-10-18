@@ -12,6 +12,12 @@ const StationMap = dynamic(() => import("./StationMap"), {
   ),
 });
 
-export default function StationMapPage({ stations }: { stations: Station[] }) {
-  return <StationMap stations={stations} />;
+export default function StationMapPage({
+  stations,
+  selectedStationCode,
+}: {
+  stations: Station[];
+  selectedStationCode?: string;
+}) {
+  return <StationMap stations={stations} selectedStationCode={selectedStationCode} />;
 }

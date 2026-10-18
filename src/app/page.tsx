@@ -4,8 +4,6 @@ import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/li
 import { INGEST_INTERVAL_MINUTES, todayInBC } from "@/lib/config";
 import { classifyByPercentile, getConditionInfo } from "@/lib/conditions";
 import AutoRefresh from "@/components/AutoRefresh";
-import StationMapModal from "@/components/StationMapModal";
-import type { Station } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +70,15 @@ async function getStations(): Promise<StationRow[]> {
     ) flow ON true
     LEFT JOIN level_percentiles lp ON lp.station_code = s.code
       AND lp.month = ${month} AND lp.day = ${day}
-    ORDER BY s.name
+    ORDER BY
+      CASE s.code
+        WHEN '08MG012' THEN 1
+        WHEN '08MG013' THEN 2
+        WHEN '08MG014' THEN 3
+        WHEN '08MG027' THEN 4
+        ELSE 5
+      END,
+      s.name
   `;
   return rows as unknown as StationRow[];
 }
@@ -82,20 +88,6 @@ export default async function DashboardPage() {
     getStations(),
     getLastIngestRun(),
   ]);
-
-  const mapStations: Station[] = stations
-    .filter((s) => s.latitude != null && s.longitude != null)
-    .map((s) => ({
-      code: s.code,
-      name: s.name,
-      waterbody: s.waterbody,
-      latitude: s.latitude,
-      longitude: s.longitude,
-      currentCondition: s.current_condition,
-      currentConditionUpdatedAt: s.current_condition_updated_at,
-      currentLevelCondition: levelConditionCode(s),
-      currentLevelConditionUpdatedAt: s.level_observed_at,
-    }));
 
   return (
     <AutoRefresh intervalSeconds={60}>
@@ -113,7 +105,6 @@ export default async function DashboardPage() {
               {formatNextUpdate(lastRunFinishedAt, INGEST_INTERVAL_MINUTES)}
             </p>
           </div>
-          {mapStations.length > 0 && <StationMapModal stations={mapStations} />}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -121,7 +112,8 @@ export default async function DashboardPage() {
             <Link
               key={s.code}
               href={`/station/${s.code}`}
-              className="rounded-lg border border-black/10 dark:border-white/10 p-4 hover:border-black/30 dark:hover:border-white/30 transition-colors"
+              aria-label={`View detailed data for ${s.name}`}
+              className="group flex flex-col rounded-lg border border-black/10 dark:border-white/10 p-4 hover:border-black/30 dark:hover:border-white/30 transition-colors"
             >
               <div className="flex items-baseline justify-between gap-2">
                 <h2 className="font-medium">{s.name}</h2>
@@ -145,6 +137,10 @@ export default async function DashboardPage() {
                   badge={<ConditionBadge code={s.current_condition} />}
                 />
               </div>
+
+              <p className="mt-4 border-t border-black/10 pt-3 text-sm font-medium text-black/60 transition-colors group-hover:text-black dark:border-white/10 dark:text-white/60 dark:group-hover:text-white">
+                View station details <span aria-hidden="true">&rarr;</span>
+              </p>
             </Link>
           ))}
         </div>

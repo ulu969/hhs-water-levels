@@ -8,14 +8,28 @@ import type { Station, StationRecord, Threshold } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-async function getStation(code: string): Promise<Station | null> {
+interface StationPageData {
+  station: Station;
+  hasLevelData: boolean;
+  hasFlowData: boolean;
+}
+
+async function getStation(code: string): Promise<StationPageData | null> {
   const { month, day } = todayInBC();
   const rows = await sql`
     SELECT
       s.code, s.name, s.waterbody, s.latitude, s.longitude,
       s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.observed_at AS level_observed_at,
-      lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100
+      lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100,
+      EXISTS (
+        SELECT 1 FROM readings
+        WHERE station_code = s.code AND parameter = 'level'
+      ) AS has_level_data,
+      EXISTS (
+        SELECT 1 FROM readings
+        WHERE station_code = s.code AND parameter = 'flow'
+      ) AS has_flow_data
     FROM stations s
     LEFT JOIN LATERAL (
       SELECT value, observed_at FROM readings
@@ -40,15 +54,19 @@ async function getStation(code: string): Promise<Station | null> {
       : classifyByPercentile(levelValue, { p0, p10, p90, p100 });
 
   return {
-    code: r.code as string,
-    name: r.name as string,
-    waterbody: r.waterbody as string,
-    latitude: r.latitude as number | null,
-    longitude: r.longitude as number | null,
-    currentCondition: r.current_condition as string | null,
-    currentConditionUpdatedAt: r.current_condition_updated_at as string | null,
-    currentLevelCondition,
-    currentLevelConditionUpdatedAt: r.level_observed_at as string | null,
+    station: {
+      code: r.code as string,
+      name: r.name as string,
+      waterbody: r.waterbody as string,
+      latitude: r.latitude as number | null,
+      longitude: r.longitude as number | null,
+      currentCondition: r.current_condition as string | null,
+      currentConditionUpdatedAt: r.current_condition_updated_at as string | null,
+      currentLevelCondition,
+      currentLevelConditionUpdatedAt: r.level_observed_at as string | null,
+    },
+    hasLevelData: r.has_level_data as boolean,
+    hasFlowData: r.has_flow_data as boolean,
   };
 }
 
@@ -86,15 +104,23 @@ export default async function StationPage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  const station = await getStation(code);
-  if (!station) notFound();
+  const stationData = await getStation(code);
+  if (!stationData) notFound();
+  const { station, hasLevelData, hasFlowData } = stationData;
 
   const [thresholds, records] = await Promise.all([getThresholds(code), getRecords(code)]);
 
   return (
     <>
       <Breadcrumbs current={station.name} />
-      <StationDetail station={station} thresholds={thresholds} records={records} />
+      <StationDetail
+        key={station.code}
+        station={station}
+        thresholds={thresholds}
+        records={records}
+        hasLevelData={hasLevelData}
+        hasFlowData={hasFlowData}
+      />
     </>
   );
 }

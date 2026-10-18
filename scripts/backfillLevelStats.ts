@@ -31,6 +31,7 @@ interface PercentileRow {
   yearsWithData: number;
   p0ObservedAt: string | null;
   p100ObservedAt: string | null;
+  recordStartYear: number | null;
   recordThroughYear: number | null;
 }
 
@@ -43,6 +44,7 @@ interface HistoricalExtremes {
 
 interface HistoricalReferenceData {
   extremes: Map<string, HistoricalExtremes>;
+  earliestYearByStation: Map<string, number>;
   latestYearByStation: Map<string, number>;
 }
 
@@ -76,6 +78,7 @@ function parseCsv(csv: string, parameter: HistoricalParameter): PercentileRow[] 
       yearsWithData: Number(years),
       p0ObservedAt: null,
       p100ObservedAt: null,
+      recordStartYear: null,
       recordThroughYear: null,
     });
   }
@@ -120,6 +123,7 @@ async function fetchHistoricalExtremes(
   parameter: HistoricalParameter
 ): Promise<HistoricalReferenceData> {
   const allExtremes = new Map<string, HistoricalExtremes>();
+  const earliestYearByStation = new Map<string, number>();
   const latestYearByStation = new Map<string, number>();
   const endDate = new Date().toISOString().slice(0, 10);
 
@@ -144,11 +148,15 @@ async function fetchHistoricalExtremes(
       const [stationCode, date] = line.split(",");
       if (!stationCode || !date) continue;
       const year = Number(date.slice(0, 4));
+      earliestYearByStation.set(
+        stationCode,
+        Math.min(earliestYearByStation.get(stationCode) ?? year, year)
+      );
       latestYearByStation.set(stationCode, Math.max(latestYearByStation.get(stationCode) ?? 0, year));
     }
   }
 
-  return { extremes: allExtremes, latestYearByStation };
+  return { extremes: allExtremes, earliestYearByStation, latestYearByStation };
 }
 
 function dataTypePrefix(parameter: HistoricalParameter): string {
@@ -157,6 +165,7 @@ function dataTypePrefix(parameter: HistoricalParameter): string {
 
 function enrichRows(rows: PercentileRow[], reference: HistoricalReferenceData): void {
   for (const row of rows) {
+    row.recordStartYear = reference.earliestYearByStation.get(row.stationCode) ?? null;
     row.recordThroughYear = reference.latestYearByStation.get(row.stationCode) ?? null;
     const extreme = reference.extremes.get(`${row.stationCode}|${row.month}|${row.day}`);
     if (!extreme) continue;
@@ -199,6 +208,7 @@ async function main() {
     ALTER TABLE level_percentiles
       ADD COLUMN IF NOT EXISTS p0_observed_at date,
       ADD COLUMN IF NOT EXISTS p100_observed_at date,
+      ADD COLUMN IF NOT EXISTS record_start_year int,
       ADD COLUMN IF NOT EXISTS record_through_year int
   `;
 
@@ -217,15 +227,21 @@ async function main() {
       years_with_data int,
       p0_observed_at date,
       p100_observed_at date,
+      record_start_year int,
       record_through_year int,
       PRIMARY KEY (station_code, month, day)
     )
   `;
 
   await sql`
+    ALTER TABLE flow_percentiles
+      ADD COLUMN IF NOT EXISTS record_start_year int
+  `;
+
+  await sql`
     INSERT INTO level_percentiles
       (station_code, month, day, p0, p10, p25, p50, p75, p90, p100, years_with_data,
-       p0_observed_at, p100_observed_at, record_through_year)
+       p0_observed_at, p100_observed_at, record_start_year, record_through_year)
     SELECT * FROM unnest(
       ${levelArrays.stationCodes}::text[],
       ${levelArrays.months}::int[],
@@ -240,6 +256,7 @@ async function main() {
       ${levelArrays.years}::int[],
       ${levelArrays.p0ObservedAts}::date[],
       ${levelArrays.p100ObservedAts}::date[],
+      ${levelArrays.recordStartYears}::int[],
       ${levelArrays.recordThroughYears}::int[]
     )
     ON CONFLICT (station_code, month, day) DO UPDATE SET
@@ -248,13 +265,14 @@ async function main() {
       years_with_data = EXCLUDED.years_with_data,
       p0_observed_at = EXCLUDED.p0_observed_at,
       p100_observed_at = EXCLUDED.p100_observed_at,
+      record_start_year = EXCLUDED.record_start_year,
       record_through_year = EXCLUDED.record_through_year
   `;
 
   await sql`
     INSERT INTO flow_percentiles
       (station_code, month, day, p0, p10, p25, p50, p75, p90, p100, years_with_data,
-       p0_observed_at, p100_observed_at, record_through_year)
+       p0_observed_at, p100_observed_at, record_start_year, record_through_year)
     SELECT * FROM unnest(
       ${flowArrays.stationCodes}::text[],
       ${flowArrays.months}::int[],
@@ -269,6 +287,7 @@ async function main() {
       ${flowArrays.years}::int[],
       ${flowArrays.p0ObservedAts}::date[],
       ${flowArrays.p100ObservedAts}::date[],
+      ${flowArrays.recordStartYears}::int[],
       ${flowArrays.recordThroughYears}::int[]
     )
     ON CONFLICT (station_code, month, day) DO UPDATE SET
@@ -277,6 +296,7 @@ async function main() {
       years_with_data = EXCLUDED.years_with_data,
       p0_observed_at = EXCLUDED.p0_observed_at,
       p100_observed_at = EXCLUDED.p100_observed_at,
+      record_start_year = EXCLUDED.record_start_year,
       record_through_year = EXCLUDED.record_through_year
   `;
 
@@ -313,6 +333,7 @@ function percentileArrays(rows: PercentileRow[]) {
     years: rows.map((row) => row.yearsWithData),
     p0ObservedAts: rows.map((row) => row.p0ObservedAt),
     p100ObservedAts: rows.map((row) => row.p100ObservedAt),
+    recordStartYears: rows.map((row) => row.recordStartYear),
     recordThroughYears: rows.map((row) => row.recordThroughYear),
   };
 }

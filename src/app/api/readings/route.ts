@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
               historicalMax: historical?.historicalMax,
               historicalMinDate: historical?.historicalMinDate,
               historicalMaxDate: historical?.historicalMaxDate,
+              historicalStartYear: historical?.historicalStartYear,
               historicalThroughYear: historical?.historicalThroughYear,
             };
           }),
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
         COALESCE(lp.p100, fp.p100) AS historical_max,
         COALESCE(lp.p0_observed_at, fp.p0_observed_at) AS historical_min_date,
         COALESCE(lp.p100_observed_at, fp.p100_observed_at) AS historical_max_date,
+        COALESCE(lp.record_start_year, fp.record_start_year) AS historical_start_year,
         COALESCE(lp.record_through_year, fp.record_through_year) AS historical_through_year
       FROM readings r
       LEFT JOIN level_percentiles lp
@@ -113,6 +115,7 @@ export async function GET(req: NextRequest) {
         COALESCE(max(lp.p100), max(fp.p100)) AS historical_max,
         COALESCE(max(lp.p0_observed_at), max(fp.p0_observed_at)) AS historical_min_date,
         COALESCE(max(lp.p100_observed_at), max(fp.p100_observed_at)) AS historical_max_date,
+        COALESCE(max(lp.record_start_year), max(fp.record_start_year)) AS historical_start_year,
         COALESCE(max(lp.record_through_year), max(fp.record_through_year)) AS historical_through_year
       FROM readings r
       LEFT JOIN level_percentiles lp
@@ -144,6 +147,8 @@ export async function GET(req: NextRequest) {
       historicalMax: r.historical_max != null ? Number(r.historical_max) : undefined,
       historicalMinDate: r.historical_min_date as string | null,
       historicalMaxDate: r.historical_max_date as string | null,
+      historicalStartYear:
+        r.historical_start_year != null ? Number(r.historical_start_year) : undefined,
       historicalThroughYear:
         r.historical_through_year != null ? Number(r.historical_through_year) : undefined,
       unit: r.unit as string,
@@ -156,6 +161,7 @@ interface HistoricalReference {
   historicalMax: number;
   historicalMinDate: string | null;
   historicalMaxDate: string | null;
+  historicalStartYear: number | null;
   historicalThroughYear: number | null;
 }
 
@@ -166,12 +172,14 @@ async function fetchHistoricalReferenceByDay(
   const rows =
     parameter === "level"
       ? await sql`
-          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at, record_through_year
+          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at,
+            record_start_year, record_through_year
           FROM level_percentiles
           WHERE station_code = ${station}
         `
       : await sql`
-          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at, record_through_year
+          SELECT month, day, p0, p100, p0_observed_at, p100_observed_at,
+            record_start_year, record_through_year
           FROM flow_percentiles
           WHERE station_code = ${station}
         `;
@@ -184,6 +192,8 @@ async function fetchHistoricalReferenceByDay(
         historicalMax: Number(row.p100),
         historicalMinDate: toDateString(row.p0_observed_at),
         historicalMaxDate: toDateString(row.p100_observed_at),
+        historicalStartYear:
+          row.record_start_year != null ? Number(row.record_start_year) : null,
         historicalThroughYear:
           row.record_through_year != null ? Number(row.record_through_year) : null,
       },

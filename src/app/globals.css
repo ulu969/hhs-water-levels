@@ -24,3 +24,54 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.leaflet-tooltip.station-map-label {
+  border: 0;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+  color: #171717;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.leaflet-tooltip-right.station-map-label::before {
+  border-right-color: #fff;
+}
+
+.leaflet-container .station-map-label-link {
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  outline: none;
+  text-decoration: none;
+}
+
+.station-map-label-name {
+  display: block;
+}
+
+.station-map-label-action {
+  display: inline-block;
+  margin-left: 0.25rem;
+  opacity: 0;
+  transform: translateX(-0.15rem);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.station-map-label-link:hover .station-map-label-name,
+.station-map-label-link:focus-visible .station-map-label-name {
+  text-decoration: underline;
+}
+
+.station-map-label-link:hover .station-map-label-action,
+.station-map-label-link:focus-visible .station-map-label-action {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.station-map-label-link:focus-visible {
+  border-radius: 0.2rem;
+  box-shadow: 0 0 0 2px #2563eb;
+}

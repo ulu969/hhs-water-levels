@@ -11,7 +11,7 @@
 // Flags:
 //   --months=N       Backfill the last N months (default 1).
 //   --since / --until  Explicit date range (YYYY-MM-DD), overrides --months.
-//   --stations=...   Comma-separated station codes (default: all 10).
+//   --stations=...   Comma-separated station codes (default: all configured stations).
 //   --chunk-days=N   Days per ECCC request (default 7). ECCC's docs ask
 //                    large requests to be split up; this keeps each request
 //                    to a manageable CSV size.
@@ -130,7 +130,7 @@ async function main() {
   );
   console.log(`Upper-bound row estimate: ~${estimated.toLocaleString()} rows.`);
 
-  // Based on estimated row volume, not window length alone — 10 stations
+  // Based on estimated row volume, not window length alone — many stations
   // for a year is very different from 2 stations for a year.
   const ROW_SAFETY_THRESHOLD = 500_000; // ~75MB at a rough ~150 bytes/row, comfortable under the 512MB free-tier cap
   if (estimated > ROW_SAFETY_THRESHOLD && !args.dryRun && !args.yes) {

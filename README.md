@@ -11,7 +11,7 @@ ECCC recent_real_time_data (CSV) --(Vercel Cron, every 5 min)--> /api/ingest -->
 ```
 
 - **Ingestion** (`src/app/api/ingest/route.ts`) fetches the latest water
-  level (parameter 46) and flow (parameter 47) readings for all 10 stations
+  level (parameter 46) and flow (parameter 47) readings for all 12 stations
   in a single request and upserts them into Postgres. It's triggered by
   Vercel Cron (`vercel.json`), not the browser — see "Scheduling" below.
 - **Storage**: Neon Postgres. Tables: `stations`, `readings`, `thresholds`
@@ -55,7 +55,7 @@ curl -X POST -H "Authorization: Bearer $INGEST_SECRET" http://localhost:3000/api
 ### Database
 
 A Neon project (`hhs-water-levels`) has already been provisioned with the
-schema and the 10 stations seeded. To inspect or modify it, use the Neon
+schema and the 12 stations seeded. To inspect or modify it, use the Neon
 console or `psql "$DATABASE_URL"`.
 
 Tables:
@@ -127,8 +127,8 @@ It's safe to re-run: inserts are deduplicated on
 failed chunk) just no-ops on rows it already has.
 
 **Storage warning:** Neon's free tier caps a branch at 512MB. A full
-18-month backfill across all 10 stations at 5-minute resolution is roughly
-**3 million rows** by rough estimate — enough to approach or exceed that
+18-month backfill across all 12 stations at 5-minute resolution is roughly
+**3.7 million rows** by rough estimate — enough to approach or exceed that
 limit. The script refuses to run any request estimated above 500,000 rows
 unless you pass `--yes` (scaled by station count and window length together,
 not window length alone), specifically to stop that from happening by
