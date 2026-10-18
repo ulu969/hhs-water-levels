@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { fetchDailyMeanReadings } from "@/lib/eccc";
 import type { Parameter, Resolution } from "@/lib/types";
+import { BC_UTC_OFFSET_HOURS } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -73,6 +74,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Historical bands are keyed by BC calendar day, so match each reading to the
+  // day it fell on in BC rather than in the database's UTC session. Daily
+  // buckets use the same BC-day boundary.
+  const bcOffset = `${BC_UTC_OFFSET_HOURS} hours`;
+
   let rows;
   if (config.resolution === "raw") {
     rows = await sql`
@@ -90,13 +96,13 @@ export async function GET(req: NextRequest) {
       LEFT JOIN level_percentiles lp
         ON r.parameter = 'level'
         AND lp.station_code = r.station_code
-        AND lp.month = EXTRACT(MONTH FROM r.observed_at)::int
-        AND lp.day = EXTRACT(DAY FROM r.observed_at)::int
+        AND lp.month = EXTRACT(MONTH FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
+        AND lp.day = EXTRACT(DAY FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
       LEFT JOIN flow_percentiles fp
         ON r.parameter = 'flow'
         AND fp.station_code = r.station_code
-        AND fp.month = EXTRACT(MONTH FROM r.observed_at)::int
-        AND fp.day = EXTRACT(DAY FROM r.observed_at)::int
+        AND fp.month = EXTRACT(MONTH FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
+        AND fp.day = EXTRACT(DAY FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
       WHERE r.station_code = ${station}
         AND r.parameter = ${parameter}
         AND r.observed_at >= now() - ${config.interval}::interval
@@ -106,7 +112,8 @@ export async function GET(req: NextRequest) {
     const truncUnit = config.resolution === "hourly" ? "hour" : "day";
     rows = await sql`
       SELECT
-        date_trunc(${truncUnit}, observed_at) AS bucket,
+        (date_trunc(${truncUnit}, (observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)
+          + ${bcOffset}::interval) AT TIME ZONE 'UTC' AS bucket,
         avg(value) AS value,
         min(value) AS min_value,
         max(value) AS max_value,
@@ -121,13 +128,13 @@ export async function GET(req: NextRequest) {
       LEFT JOIN level_percentiles lp
         ON r.parameter = 'level'
         AND lp.station_code = r.station_code
-        AND lp.month = EXTRACT(MONTH FROM r.observed_at)::int
-        AND lp.day = EXTRACT(DAY FROM r.observed_at)::int
+        AND lp.month = EXTRACT(MONTH FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
+        AND lp.day = EXTRACT(DAY FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
       LEFT JOIN flow_percentiles fp
         ON r.parameter = 'flow'
         AND fp.station_code = r.station_code
-        AND fp.month = EXTRACT(MONTH FROM r.observed_at)::int
-        AND fp.day = EXTRACT(DAY FROM r.observed_at)::int
+        AND fp.month = EXTRACT(MONTH FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
+        AND fp.day = EXTRACT(DAY FROM (r.observed_at AT TIME ZONE 'UTC') - ${bcOffset}::interval)::int
       WHERE r.station_code = ${station}
         AND r.parameter = ${parameter}
         AND r.observed_at >= now() - ${config.interval}::interval
