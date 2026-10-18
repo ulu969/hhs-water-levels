@@ -6,7 +6,7 @@ import L from "leaflet";
 import { MapContainer, Marker, TileLayer, Tooltip } from "react-leaflet";
 import Link from "next/link";
 import type { Station } from "@/lib/types";
-import { CONDITION_INFO, getConditionInfo } from "@/lib/conditions";
+import { CONDITION_INFO, getConditionInfo, isConditionUnavailable } from "@/lib/conditions";
 
 type MapDataSet = "flow" | "level";
 
@@ -74,10 +74,7 @@ export default function StationMap({
         {stations.map((s) => {
           const conditionCode =
             dataSet === "flow" ? s.currentCondition : s.currentLevelCondition;
-          const conditionUnavailable =
-            !conditionCode ||
-            (dataSet === "flow" && conditionCode === "NO_DISCHARGE_DATA") ||
-            (dataSet === "level" && conditionCode === "NO_LEVEL_DATA");
+          const conditionUnavailable = isConditionUnavailable(conditionCode);
           const conditionInfo = conditionUnavailable ? null : getConditionInfo(conditionCode);
           const conditionLabel = conditionInfo?.label ?? "Condition unavailable";
           const dataSetLabel = dataSet === "flow" ? "Flow rate" : "Water level";

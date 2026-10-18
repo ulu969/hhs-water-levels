@@ -15,7 +15,9 @@ export type ConditionCode =
   | "NOT_FLOWING"
   | "LACK_OF_STATS"
   | "NO_DISCHARGE_DATA"
-  | "NO_LEVEL_DATA";
+  | "NO_LEVEL_DATA"
+  // Ours, not ECCC's: the latest reading is too old to rank (see queries.ts).
+  | "STALE_DATA";
 
 export interface ConditionInfo {
   label: string;
@@ -62,6 +64,11 @@ export const CONDITION_INFO: Record<ConditionCode, ConditionInfo> = {
   LACK_OF_STATS: { label: "Not ranked — insufficient data", ...GREEN },
   NO_DISCHARGE_DATA: { label: "No discharge data", ...GREEN },
   NO_LEVEL_DATA: { label: "No water level data", ...GREEN },
+  STALE_DATA: {
+    label: "No recent reading",
+    badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
+    dotColor: "#78716c",
+  },
 };
 
 const FALLBACK: ConditionInfo = {
@@ -69,6 +76,12 @@ const FALLBACK: ConditionInfo = {
   badgeClass: "bg-black/10 text-black/60 dark:bg-white/10 dark:text-white/60",
   dotColor: "#78716c",
 };
+
+// Codes that mean "no status to show": rendered as a muted badge and the gray
+// "Condition unavailable" map marker rather than a red/yellow/green one.
+export function isConditionUnavailable(code: string | null | undefined): boolean {
+  return !code || code === "NO_LEVEL_DATA" || code === "NO_DISCHARGE_DATA" || code === "STALE_DATA";
+}
 
 export function getConditionInfo(code: string | null | undefined): ConditionInfo | null {
   if (!code) return null;
