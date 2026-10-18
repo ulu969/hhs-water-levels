@@ -1,43 +1,13 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
-import { INGEST_INTERVAL_MINUTES, todayInBC } from "@/lib/config";
-import { classifyByPercentile, getConditionInfo } from "@/lib/conditions";
+import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
+import { getConditionInfo, isConditionUnavailable } from "@/lib/conditions";
+import { getStationSnapshots } from "@/lib/queries";
+import type { Reading } from "@/lib/types";
 import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
-
-interface StationRow {
-  code: string;
-  name: string;
-  waterbody: string;
-  latitude: number | null;
-  longitude: number | null;
-  current_condition: string | null;
-  current_condition_updated_at: string | null;
-  level_value: number | null;
-  level_unit: string | null;
-  level_observed_at: string | null;
-  flow_value: number | null;
-  flow_unit: string | null;
-  flow_observed_at: string | null;
-  level_p0: number | null;
-  level_p10: number | null;
-  level_p90: number | null;
-  level_p100: number | null;
-}
-
-function levelConditionCode(s: StationRow): string {
-  if (s.level_value == null || s.level_p0 == null || s.level_p10 == null || s.level_p90 == null || s.level_p100 == null) {
-    return "NO_LEVEL_DATA";
-  }
-  return classifyByPercentile(s.level_value, {
-    p0: s.level_p0,
-    p10: s.level_p10,
-    p90: s.level_p90,
-    p100: s.level_p100,
-  });
-}
 
 async function getLastIngestRun(): Promise<string | null> {
   const rows = await sql`
@@ -48,44 +18,9 @@ async function getLastIngestRun(): Promise<string | null> {
   return rows.length > 0 ? (rows[0].finished_at as string) : null;
 }
 
-async function getStations(): Promise<StationRow[]> {
-  const { month, day } = todayInBC();
-  const rows = await sql`
-    SELECT
-      s.code, s.name, s.waterbody, s.latitude, s.longitude,
-      s.current_condition, s.current_condition_updated_at,
-      lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
-      flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at,
-      lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100
-    FROM stations s
-    LEFT JOIN LATERAL (
-      SELECT value, unit, observed_at FROM readings
-      WHERE station_code = s.code AND parameter = 'level'
-      ORDER BY observed_at DESC LIMIT 1
-    ) lvl ON true
-    LEFT JOIN LATERAL (
-      SELECT value, unit, observed_at FROM readings
-      WHERE station_code = s.code AND parameter = 'flow'
-      ORDER BY observed_at DESC LIMIT 1
-    ) flow ON true
-    LEFT JOIN level_percentiles lp ON lp.station_code = s.code
-      AND lp.month = ${month} AND lp.day = ${day}
-    ORDER BY
-      CASE s.code
-        WHEN '08MG012' THEN 1
-        WHEN '08MG013' THEN 2
-        WHEN '08MG014' THEN 3
-        WHEN '08MG027' THEN 4
-        ELSE 5
-      END,
-      s.name
-  `;
-  return rows as unknown as StationRow[];
-}
-
 export default async function DashboardPage() {
   const [stations, lastRunFinishedAt] = await Promise.all([
-    getStations(),
+    getStationSnapshots(),
     getLastIngestRun(),
   ]);
 
@@ -124,17 +59,13 @@ export default async function DashboardPage() {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <Metric
                   label="Water level"
-                  value={s.level_value}
-                  unit={s.level_unit}
-                  observedAt={s.level_observed_at}
-                  badge={<ConditionBadge code={levelConditionCode(s)} />}
+                  reading={s.level}
+                  badge={<ConditionBadge code={s.currentLevelCondition} />}
                 />
                 <Metric
                   label="Flow rate"
-                  value={s.flow_value}
-                  unit={s.flow_unit}
-                  observedAt={s.flow_observed_at}
-                  badge={<ConditionBadge code={s.current_condition} />}
+                  reading={s.flow}
+                  badge={<ConditionBadge code={s.currentCondition} />}
                 />
               </div>
 
@@ -153,7 +84,7 @@ function ConditionBadge({ code }: { code: string | null }) {
   const info = getConditionInfo(code);
   if (!info) return null;
 
-  const isNoData = code === "NO_LEVEL_DATA" || code === "NO_DISCHARGE_DATA";
+  const isNoData = isConditionUnavailable(code);
 
   return (
     <span
@@ -170,18 +101,14 @@ function ConditionBadge({ code }: { code: string | null }) {
 
 function Metric({
   label,
-  value,
-  unit,
-  observedAt,
+  reading,
   badge,
 }: {
   label: string;
-  value: number | null;
-  unit: string | null;
-  observedAt: string | null;
+  reading: Reading | null;
   badge?: React.ReactNode;
 }) {
-  if (value == null || unit == null || observedAt == null) {
+  if (!reading) {
     return (
       <div>
         <p className="text-xs text-black/50 dark:text-white/50">{label}</p>
@@ -191,6 +118,7 @@ function Metric({
     );
   }
 
+  const { value, unit, observedAt } = reading;
   const stale = isStale(observedAt);
 
   return (

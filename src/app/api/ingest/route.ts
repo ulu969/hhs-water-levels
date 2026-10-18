@@ -27,20 +27,29 @@ async function runIngest() {
       fetchRecentReadings(STATION_CODES),
       fetchCurrentConditions(STATION_CODES),
     ]);
-    const [rowsInserted] = await Promise.all([
+    const [{ inserted, updated }] = await Promise.all([
       upsertReadings(sql, readings),
       updateConditions(sql, conditions),
     ]);
 
+    // A station counts as OK only if ECCC actually returned a reading for it.
+    const reported = new Set(readings.map((r) => r.stationCode));
+    const missing = STATION_CODES.filter((code) => !reported.has(code));
+    if (missing.length > 0) {
+      console.warn(`ECCC returned no readings for: ${missing.join(", ")}`);
+    }
+
     await sql`
       INSERT INTO ingest_runs (started_at, finished_at, stations_ok, stations_failed, rows_inserted)
-      VALUES (${startedAt.toISOString()}, now(), ${STATION_CODES.length}, 0, ${rowsInserted})
+      VALUES (${startedAt.toISOString()}, now(), ${STATION_CODES.length - missing.length}, ${missing.length}, ${inserted})
     `;
 
     return NextResponse.json({
       ok: true,
       fetched: readings.length,
-      inserted: rowsInserted,
+      inserted,
+      revised: updated,
+      missingStations: missing,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

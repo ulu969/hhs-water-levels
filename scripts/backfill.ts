@@ -169,9 +169,9 @@ async function main() {
       if (args.dryRun) {
         console.log(`${label}: fetched ${readings.length} rows (dry run, not written)`);
       } else {
-        const inserted = await upsertReadings(sql!, readings);
+        const { inserted, updated } = await upsertReadings(sql!, readings);
         totalInserted += inserted;
-        console.log(`${label}: fetched ${readings.length}, inserted ${inserted}`);
+        console.log(`${label}: fetched ${readings.length}, inserted ${inserted}, revised ${updated}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
