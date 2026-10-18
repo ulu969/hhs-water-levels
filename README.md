@@ -110,6 +110,18 @@ for this — it was considered and deliberately dropped in favor of a fixed
 5-minute cadence (see the dashboard's "next update" label, sourced from
 `ingest_runs`).
 
+## Monitoring
+
+`GET /api/health` returns `200` while data is flowing and `503` when the last
+successful ingest run is more than 15 minutes old or the newest reading from
+any station is more than 3 hours old. The JSON body lists which check failed.
+It's public (no secret) so an uptime monitor can poll it, and exposes only
+timestamps and counts.
+
+Point a free uptime monitor (e.g. UptimeRobot or Better Stack) at
+`https://<your-domain>/api/health` with a 5-minute interval and email alerts
+to get notified when ingestion stops.
+
 ## Backfilling history
 
 `/api/ingest` only captures data going forward. To seed charts with history,
@@ -158,6 +170,5 @@ to retry just the failed range.
 - `thresholds` is empty until you populate it with real flood-stage values.
 - ECCC readings are provisional and can be revised; this app stores whatever
   value was live at fetch time.
-- No alerting yet on `ingest_runs` failures or stale data.
 - The backfill script only pulls raw 5-minute data; no daily-mean path yet
   for cheaply seeding years of history without the storage cost.
