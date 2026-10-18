@@ -10,7 +10,9 @@ export const INGEST_INTERVAL_MINUTES = 5;
 // PST/PDT rule. Rather than depend on a named timezone that's currently
 // wrong (and permanently unnecessary now that BC will never change again),
 // this computes BC's local calendar date directly from a fixed offset.
+export const BC_UTC_OFFSET_HOURS = 7;
+
 export function todayInBC(): { month: number; day: number } {
-  const bcNow = new Date(Date.now() - 7 * 60 * 60 * 1000);
+  const bcNow = new Date(Date.now() - BC_UTC_OFFSET_HOURS * 60 * 60 * 1000);
   return { month: bcNow.getUTCMonth() + 1, day: bcNow.getUTCDate() };
 }
