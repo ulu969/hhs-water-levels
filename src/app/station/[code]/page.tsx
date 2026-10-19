@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import StationDetail from "@/components/StationDetail";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import AutoRefresh from "@/components/AutoRefresh";
+import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
 import { getStationSnapshots } from "@/lib/queries";
 import { parseStationView } from "@/lib/stationView";
 import type { Station, StationRecord, Threshold } from "@/lib/types";
@@ -68,8 +70,10 @@ export default async function StationPage({
   ]);
   const initialView = parseStationView(query, { hasLevelData, hasFlowData });
 
+  // Refreshes the condition badges and "as of" times; StationDetail re-fetches
+  // its own chart readings on the same cadence.
   return (
-    <>
+    <AutoRefresh intervalSeconds={INGEST_INTERVAL_MINUTES * 60}>
       <Breadcrumbs current={station.name} />
       <StationDetail
         key={station.code}
@@ -80,6 +84,6 @@ export default async function StationPage({
         hasFlowData={hasFlowData}
         initialView={initialView}
       />
-    </>
+    </AutoRefresh>
   );
 }

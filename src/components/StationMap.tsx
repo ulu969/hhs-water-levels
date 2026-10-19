@@ -134,7 +134,7 @@ export default function StationMap({
       <div
         role="group"
         aria-label="Map data set"
-        className="absolute left-1/2 top-3 z-[1000] flex -translate-x-1/2 rounded-md border border-black/10 bg-white/95 p-1 text-xs text-black shadow-md"
+        className="absolute left-1/2 top-3 z-[1000] flex -translate-x-1/2 rounded-md border border-black/10 bg-background/95 p-1 text-xs text-foreground shadow-md dark:border-white/15"
       >
         {(["flow", "level"] as const).map((option) => {
           const selected = dataSet === option;
@@ -149,8 +149,8 @@ export default function StationMap({
               }}
               className={`rounded px-2.5 py-1.5 font-medium transition-colors ${
                 selected
-                  ? "bg-black text-white"
-                  : "text-black/60 hover:bg-black/5 hover:text-black"
+                  ? "bg-black text-white dark:bg-white dark:text-black"
+                  : "text-black/60 hover:bg-black/5 hover:text-black dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
               }`}
             >
               {option === "flow" ? "Flow rate" : "Water level"}
@@ -160,7 +160,7 @@ export default function StationMap({
       </div>
       <aside
         aria-label={`${dataSet === "flow" ? "Flow rate" : "Water level"} marker colour legend`}
-        className="pointer-events-none absolute right-3 top-3 z-[1000] rounded-md border border-black/10 bg-white/95 px-3 py-2 text-black shadow-md"
+        className="pointer-events-none absolute right-3 top-3 z-[1000] rounded-md border border-black/10 bg-background/95 px-3 py-2 text-foreground shadow-md dark:border-white/15"
       >
         <h2 className="text-xs font-semibold">
           {dataSet === "flow" ? "Flow rate" : "Water level"} marker colours

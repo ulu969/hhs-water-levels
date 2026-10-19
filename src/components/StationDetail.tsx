@@ -14,6 +14,8 @@ import {
 } from "recharts";
 import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
+import { useVisibleInterval } from "@/lib/useVisibleInterval";
+import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
 import { getConditionInfo, relevantStatLabel } from "@/lib/conditions";
 import {
   RANGES,
@@ -23,6 +25,9 @@ import {
   type StationView,
   type View,
 } from "@/lib/stationView";
+
+// Matches the ingest cron, so each refresh can pick up one new reading.
+const READINGS_REFRESH_MS = INGEST_INTERVAL_MINUTES * 60_000;
 
 interface ReadingPoint {
   observedAt: string;
@@ -75,8 +80,19 @@ export default function StationDetail({
     readings: ReadingPoint[];
   } | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  // Bumped by the refresh timer. It isn't part of requestKey, so the current
+  // chart stays on screen while the newer readings load.
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const requestKey = `${station.code}|${parameter}|${range}`;
+
+  // The 30-day and 1-year views are daily means that change once a day, so
+  // only the views built from live readings re-fetch.
+  useVisibleInterval(
+    () => setRefreshTick((tick) => tick + 1),
+    READINGS_REFRESH_MS,
+    range === "24h" || range === "7d"
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -97,7 +113,7 @@ export default function StationDetail({
     return () => {
       cancelled = true;
     };
-  }, [station.code, parameter, range, requestKey]);
+  }, [station.code, parameter, range, requestKey, refreshTick]);
 
   const status: "loading" | "ready" | "error" =
     loaded?.key === requestKey ? "ready" : errorKey === requestKey ? "error" : "loading";
