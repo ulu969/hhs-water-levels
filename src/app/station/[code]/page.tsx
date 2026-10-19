@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import StationDetail from "@/components/StationDetail";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { getStationSnapshots } from "@/lib/queries";
+import { parseStationView } from "@/lib/stationView";
 import type { Station, StationRecord, Threshold } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -50,15 +51,22 @@ async function getThresholds(code: string): Promise<Threshold[]> {
 
 export default async function StationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { code } = await params;
   const stationData = await getStation(code);
   if (!stationData) notFound();
   const { station, hasLevelData, hasFlowData } = stationData;
 
-  const [thresholds, records] = await Promise.all([getThresholds(code), getRecords(code)]);
+  const [thresholds, records, query] = await Promise.all([
+    getThresholds(code),
+    getRecords(code),
+    searchParams,
+  ]);
+  const initialView = parseStationView(query, { hasLevelData, hasFlowData });
 
   return (
     <>
@@ -70,6 +78,7 @@ export default async function StationPage({
         records={records}
         hasLevelData={hasLevelData}
         hasFlowData={hasFlowData}
+        initialView={initialView}
       />
     </>
   );

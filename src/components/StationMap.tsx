@@ -49,6 +49,12 @@ export default function StationMap({
 }) {
   const [dataSet, setDataSet] = useState<MapDataSet>("level");
   const [hoveredStationCode, setHoveredStationCode] = useState<string | null>(null);
+  // Phones and tablets can't hover, so a tap on a marker pins its status open.
+  // A station opened from its "Show on map" link starts pinned.
+  const [pinnedStationCode, setPinnedStationCode] = useState<string | null>(
+    selectedStationCode ?? null
+  );
+  const activeStationCode = hoveredStationCode ?? pinnedStationCode;
   // page.tsx only passes stations with known coordinates, so the `!` below is safe.
   const bounds = stations.map((s) => [s.latitude!, s.longitude!] as [number, number]);
   const selectedStation = stations.find((station) => station.code === selectedStationCode);
@@ -87,6 +93,12 @@ export default function StationMap({
               eventHandlers={{
                 mouseover: () => setHoveredStationCode(s.code),
                 mouseout: () => setHoveredStationCode(null),
+                // Touch browsers send a mouseover with the tap and never a
+                // mouseout, so clear the hover too or a second tap can't close it.
+                click: () => {
+                  setHoveredStationCode(null);
+                  setPinnedStationCode((current) => (current === s.code ? null : s.code));
+                },
               }}
             >
               <Tooltip
@@ -108,7 +120,7 @@ export default function StationMap({
                       &rarr;
                     </span>
                   </span>
-                  {hoveredStationCode === s.code && (
+                  {activeStationCode === s.code && (
                     <span className="mt-0.5 block font-normal text-black/65">
                       {dataSetLabel} status: {conditionLabel}
                     </span>

@@ -2,6 +2,21 @@ export function formatValue(value: number, unit: string): string {
   return `${value.toFixed(2)} ${unit}`;
 }
 
+// "+0.18 m in 24 h", "−12.40 m³/s in 24 h", or "Steady over 24 h" when the
+// change rounds to zero at the precision shown.
+export function formatChange(change: number, unit: string): {
+  direction: "up" | "down" | "steady";
+  text: string;
+} {
+  const rounded = Number(change.toFixed(2));
+  if (rounded === 0) return { direction: "steady", text: "Steady over 24 h" };
+  const sign = rounded > 0 ? "+" : "\u2212";
+  return {
+    direction: rounded > 0 ? "up" : "down",
+    text: `${sign}${Math.abs(rounded).toFixed(2)} ${unit} in 24 h`,
+  };
+}
+
 export function formatTimestamp(iso: string): string {
   return new Date(iso).toLocaleString("en-CA", {
     dateStyle: "medium",

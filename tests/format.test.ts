@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
+import {
+  formatChange,
+  formatNextUpdate,
+  formatRelativeTime,
+  formatValue,
+  isStale,
+} from "@/lib/format";
 import { todayInBC } from "@/lib/config";
 
 const NOW = new Date("2026-10-18T20:00:00Z");
@@ -50,5 +56,27 @@ describe("todayInBC", () => {
   it("stays on UTC-7 in winter (permanent PDT)", () => {
     vi.setSystemTime(new Date("2027-01-15T07:30:00Z"));
     expect(todayInBC()).toEqual({ month: 1, day: 15 });
+  });
+});
+
+describe("formatChange", () => {
+  it("shows a rise with a plus sign", () => {
+    expect(formatChange(0.18, "m")).toEqual({ direction: "up", text: "+0.18 m in 24 h" });
+  });
+
+  it("shows a fall with a minus sign", () => {
+    expect(formatChange(-12.4, "m³/s")).toEqual({
+      direction: "down",
+      text: "\u221212.40 m³/s in 24 h",
+    });
+  });
+
+  it("calls a change that rounds to zero steady", () => {
+    expect(formatChange(0.004, "m").direction).toBe("steady");
+    expect(formatChange(-0.004, "m").text).toBe("Steady over 24 h");
+  });
+
+  it("rounds before choosing the direction", () => {
+    expect(formatChange(0.005, "m")).toEqual({ direction: "up", text: "+0.01 m in 24 h" });
   });
 });

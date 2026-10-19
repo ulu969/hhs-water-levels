@@ -15,13 +15,14 @@ import {
 import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@/lib/types";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
 import { getConditionInfo, relevantStatLabel } from "@/lib/conditions";
-
-const RANGES: { value: string; label: string }[] = [
-  { value: "24h", label: "Last 24 hours" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "1y", label: "Last year" },
-];
+import {
+  RANGES,
+  defaultStationView,
+  stationViewQuery,
+  type Range,
+  type StationView,
+  type View,
+} from "@/lib/stationView";
 
 interface ReadingPoint {
   observedAt: string;
@@ -41,18 +42,30 @@ export default function StationDetail({
   records,
   hasLevelData,
   hasFlowData,
+  initialView,
 }: {
   station: Station;
   thresholds: Threshold[];
   records: StationRecord[];
   hasLevelData: boolean;
   hasFlowData: boolean;
+  initialView: StationView;
 }) {
-  const [parameter, setParameter] = useState<Parameter>(
-    !hasLevelData && hasFlowData ? "flow" : "level"
-  );
-  const [range, setRange] = useState("1y");
-  const [view, setView] = useState<"chart" | "table">("chart");
+  const [parameter, setParameter] = useState<Parameter>(initialView.parameter);
+  const [range, setRange] = useState<Range>(initialView.range);
+  const [view, setView] = useState<View>(initialView.view);
+
+  // Mirror the choices into the URL. replaceState rather than pushState so
+  // flicking between options doesn't fill the back button's history.
+  useEffect(() => {
+    const query = stationViewQuery(
+      { parameter, range, view },
+      defaultStationView({ hasLevelData, hasFlowData })
+    );
+    if (window.location.search !== query) {
+      window.history.replaceState(null, "", `${window.location.pathname}${query}`);
+    }
+  }, [parameter, range, view, hasLevelData, hasFlowData]);
   const [showHistoricalMax, setShowHistoricalMax] = useState(false);
   const [showHistoricalMin, setShowHistoricalMin] = useState(false);
   const [mobileTooltipTarget, setMobileTooltipTarget] = useState<HTMLDivElement | null>(null);
@@ -177,7 +190,7 @@ export default function StationDetail({
         />
         <ToggleGroup
           value={view}
-          onChange={(v) => setView(v as "chart" | "table")}
+          onChange={(v) => setView(v as View)}
           options={[
             { value: "chart", label: "Graph" },
             { value: "table", label: "Table" },
@@ -185,7 +198,7 @@ export default function StationDetail({
         />
         <select
           value={range}
-          onChange={(e) => setRange(e.target.value)}
+          onChange={(e) => setRange(e.target.value as Range)}
           className="rounded-md border border-black/15 dark:border-white/15 bg-transparent px-3 py-1.5 text-sm"
         >
           {RANGES.map((r) => (

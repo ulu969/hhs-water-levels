@@ -2,7 +2,7 @@ import { sql } from "./db";
 import { classifyByPercentile } from "./conditions";
 import { todayInBC } from "./config";
 import { isStale } from "./format";
-import type { Reading, Station } from "./types";
+import type { LatestReading, Reading, Station } from "./types";
 
 // How old a reading can be before its condition badge is withheld. Looser
 // than the 90-minute amber "stale" timestamp on the cards: some ECCC gauges
@@ -10,9 +10,13 @@ import type { Reading, Station } from "./types";
 // historical band doesn't change that fast.
 const CONDITION_STALE_MINUTES = 6 * 60;
 
+// The trend compares against the reading closest to 24 hours before the latest
+// one, allowing this much slack for gaps in the gauge's record.
+const TREND_WINDOW_SLACK = "2 hours";
+
 export interface StationSnapshot extends Station {
-  level: Reading | null;
-  flow: Reading | null;
+  level: LatestReading | null;
+  flow: LatestReading | null;
 }
 
 // Latest level and flow reading for every station, plus both condition
@@ -27,6 +31,7 @@ export async function getStationSnapshots(): Promise<StationSnapshot[]> {
       s.current_condition, s.current_condition_updated_at,
       lvl.value AS level_value, lvl.unit AS level_unit, lvl.observed_at AS level_observed_at,
       flow.value AS flow_value, flow.unit AS flow_unit, flow.observed_at AS flow_observed_at,
+      lvl_prev.value AS level_prev_value, flow_prev.value AS flow_prev_value,
       lp.p0 AS level_p0, lp.p10 AS level_p10, lp.p90 AS level_p90, lp.p100 AS level_p100
     FROM stations s
     LEFT JOIN LATERAL (
@@ -39,6 +44,20 @@ export async function getStationSnapshots(): Promise<StationSnapshot[]> {
       WHERE station_code = s.code AND parameter = 'flow'
       ORDER BY observed_at DESC LIMIT 1
     ) flow ON true
+    LEFT JOIN LATERAL (
+      SELECT value FROM readings
+      WHERE station_code = s.code AND parameter = 'level'
+        AND observed_at <= lvl.observed_at - interval '24 hours'
+        AND observed_at >= lvl.observed_at - interval '24 hours' - ${TREND_WINDOW_SLACK}::interval
+      ORDER BY observed_at DESC LIMIT 1
+    ) lvl_prev ON true
+    LEFT JOIN LATERAL (
+      SELECT value FROM readings
+      WHERE station_code = s.code AND parameter = 'flow'
+        AND observed_at <= flow.observed_at - interval '24 hours'
+        AND observed_at >= flow.observed_at - interval '24 hours' - ${TREND_WINDOW_SLACK}::interval
+      ORDER BY observed_at DESC LIMIT 1
+    ) flow_prev ON true
     LEFT JOIN level_percentiles lp ON lp.station_code = s.code
       AND lp.month = ${month} AND lp.day = ${day}
     ORDER BY
@@ -53,8 +72,14 @@ export async function getStationSnapshots(): Promise<StationSnapshot[]> {
   `;
 
   return rows.map((r) => {
-    const level = toReading(r.level_value, r.level_unit, r.level_observed_at);
-    const flow = toReading(r.flow_value, r.flow_unit, r.flow_observed_at);
+    const level = toLatestReading(
+      toReading(r.level_value, r.level_unit, r.level_observed_at),
+      r.level_prev_value
+    );
+    const flow = toLatestReading(
+      toReading(r.flow_value, r.flow_unit, r.flow_observed_at),
+      r.flow_prev_value
+    );
     const conditionUpdatedAt = toIso(r.current_condition_updated_at);
 
     return {
@@ -119,6 +144,14 @@ export function flowCondition(
 function toReading(value: unknown, unit: unknown, observedAt: unknown): Reading | null {
   if (value == null || unit == null || observedAt == null) return null;
   return { value: Number(value), unit: unit as string, observedAt: toIso(observedAt)! };
+}
+
+function toLatestReading(reading: Reading | null, previousValue: unknown): LatestReading | null {
+  if (!reading) return null;
+  return {
+    ...reading,
+    change24h: previousValue == null ? null : reading.value - Number(previousValue),
+  };
 }
 
 function toIso(value: unknown): string | null {
