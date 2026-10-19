@@ -1,0 +1,59 @@
+name: Set up database (manual)
+
+# Creates the tables in an empty database and fills them from ECCC. Safe to
+# re-run: the schema is idempotent and every script upserts.
+#
+# Needs a DATABASE_URL repository secret holding the Supabase POSTGRES_URL
+# value from Vercel (the pooled connection works from GitHub's runners; the
+# direct one is IPv6-only).
+on:
+  workflow_dispatch:
+    inputs:
+      months:
+        description: Months of 5-minute readings to load (ECCC keeps about 18)
+        default: "18"
+        required: true
+      readings_dry_run:
+        description: Only count the readings, without writing them
+        type: boolean
+        default: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Apply schema
+        run: |
+          # psql rejects Supabase's `supa=` marker param, so drop it first.
+          url=$(node -e 'const u = new URL(process.env.DATABASE_URL); u.searchParams.delete("supa"); console.log(u.toString())')
+          psql "$url" -v ON_ERROR_STOP=1 -q -f db/schema.sql
+
+      - name: Station coordinates
+        run: npm run seed-stations
+
+      - name: Daily statistics
+        run: npm run backfill-level-stats
+
+      - name: All-time records
+        run: npm run backfill-records
+
+      - name: Readings
+        env:
+          MONTHS: ${{ inputs.months }}
+          DRY_RUN: ${{ inputs.readings_dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm run backfill -- --months="$MONTHS" --dry-run
+          else
+            npm run backfill -- --months="$MONTHS" --yes
+          fi

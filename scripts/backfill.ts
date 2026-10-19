@@ -17,16 +17,20 @@
 //                    to a manageable CSV size.
 //   --delay-ms=N     Delay between requests, to stay polite to ECCC's
 //                    servers (default 400).
+//   --max-db-mb=N    Stop before the next chunk once the database reaches N MB
+//                    (default 450, under Supabase's 500MB free-plan cap, past
+//                    which the database turns read-only). Chunks run newest
+//                    first, so stopping early keeps the most recent history.
 //   --dry-run        Fetch and report counts without writing to the DB.
 //   --yes            Required to proceed past the storage-size safety
 //                     guard (see below).
 
-import { neon } from "@neondatabase/serverless";
+import { createSql, databaseUrl, type Sql } from "../src/lib/postgres";
 import { fetchHistoricalReadings } from "../src/lib/eccc";
 import { upsertReadings } from "../src/lib/upsertReadings";
 import { STATION_CODES } from "../src/lib/stations";
 
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl()) {
   try {
     process.loadEnvFile(".env.local");
   } catch {
@@ -41,6 +45,7 @@ interface Args {
   stations: string[];
   chunkDays: number;
   delayMs: number;
+  maxDbMb: number;
   dryRun: boolean;
   yes: boolean;
 }
@@ -58,6 +63,7 @@ function parseArgs(argv: string[]): Args {
     stations: stationsArg ? stationsArg.split(",").map((s) => s.trim()) : [...STATION_CODES],
     chunkDays: Number(get("chunk-days") ?? "7"),
     delayMs: Number(get("delay-ms") ?? "400"),
+    maxDbMb: Number(get("max-db-mb") ?? "450"),
     dryRun: argv.includes("--dry-run"),
     yes: argv.includes("--yes"),
   };
@@ -102,6 +108,11 @@ async function fetchChunkWithRetry(
   throw new Error("unreachable");
 }
 
+async function databaseSizeMb(sql: Sql): Promise<number> {
+  const [row] = await sql`SELECT pg_database_size(current_database()) AS bytes`;
+  return Math.round(Number(row.bytes) / 1_048_576);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -132,18 +143,18 @@ async function main() {
 
   // Based on estimated row volume, not window length alone — many stations
   // for a year is very different from 2 stations for a year.
-  const ROW_SAFETY_THRESHOLD = 500_000; // ~75MB at a rough ~150 bytes/row, comfortable under the 512MB free-tier cap
+  const ROW_SAFETY_THRESHOLD = 500_000; // ~60MB at roughly 120 bytes/row with its index, well under Supabase's 500MB free-plan cap
   if (estimated > ROW_SAFETY_THRESHOLD && !args.dryRun && !args.yes) {
     console.error(
       `\nRefusing to run: the upper-bound estimate (~${estimated.toLocaleString()} rows) exceeds the ` +
-        `${ROW_SAFETY_THRESHOLD.toLocaleString()}-row safety guard. Neon's free tier caps a branch at ` +
-        `512MB, and a request this large can approach or exceed that. Re-run with --yes to proceed anyway, ` +
+        `${ROW_SAFETY_THRESHOLD.toLocaleString()}-row safety guard. Supabase's free plan caps the ` +
+        `database at 500MB, and a request this large can approach or exceed that. Re-run with --yes to proceed anyway, ` +
         `or request fewer stations / a shorter window with --stations=, --months=, or --since=/--until=.`
     );
     process.exit(1);
   }
 
-  const sql = args.dryRun ? null : neon(process.env.DATABASE_URL!);
+  const sql = args.dryRun ? null : createSql(databaseUrl()!, { max: 1 });
 
   const chunks: { start: Date; end: Date }[] = [];
   for (let cursor = new Date(start); cursor < end; ) {
@@ -153,6 +164,7 @@ async function main() {
     chunks.push({ start: new Date(cursor), end: chunkEnd });
     cursor = chunkEnd;
   }
+  chunks.reverse();
 
   let totalFetched = 0;
   let totalInserted = 0;
@@ -162,6 +174,18 @@ async function main() {
     const label = `[${i + 1}/${chunks.length}] ${chunk.start.toISOString().slice(0, 10)} → ${chunk.end
       .toISOString()
       .slice(0, 10)}`;
+    if (sql) {
+      const sizeMb = await databaseSizeMb(sql);
+      if (sizeMb >= args.maxDbMb) {
+        console.error(
+          `${label}: stopping, the database is ${sizeMb} MB (limit ${args.maxDbMb} MB). ` +
+            `Older chunks were not loaded.`
+        );
+        process.exitCode = 1;
+        break;
+      }
+    }
+
     try {
       const readings = await fetchChunkWithRetry(args.stations, chunk.start, chunk.end);
       totalFetched += readings.length;
@@ -186,7 +210,11 @@ async function main() {
     if (i < chunks.length - 1) await sleep(args.delayMs);
   }
 
+  const finalSizeMb = sql ? await databaseSizeMb(sql) : null;
+  await sql?.end();
+
   console.log("\n--- Summary ---");
+  if (finalSizeMb != null) console.log(`Database size: ${finalSizeMb} MB`);
   console.log(`Fetched: ${totalFetched.toLocaleString()} rows`);
   if (!args.dryRun) console.log(`Inserted: ${totalInserted.toLocaleString()} new rows`);
   if (failedChunks.length > 0) {

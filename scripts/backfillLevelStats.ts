@@ -6,10 +6,10 @@
 //
 // Usage: npm run backfill-level-stats
 
-import { neon } from "@neondatabase/serverless";
+import { createSql, databaseUrl } from "../src/lib/postgres";
 import { STATION_CODES } from "../src/lib/stations";
 
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl()) {
   try {
     process.loadEnvFile(".env.local");
   } catch {
@@ -199,7 +199,7 @@ async function main() {
   enrichRows(levelRows, levelReference);
   enrichRows(flowRows, flowReference);
 
-  const sql = neon(process.env.DATABASE_URL!);
+  const sql = createSql(databaseUrl()!, { max: 1 });
 
   const levelArrays = percentileArrays(levelRows);
   const flowArrays = percentileArrays(flowRows);
@@ -302,6 +302,7 @@ async function main() {
 
   console.log(`Upserted ${levelRows.length} rows into level_percentiles.`);
   console.log(`Upserted ${flowRows.length} rows into flow_percentiles.`);
+  await sql.end();
 
   const levelPerStation = new Map<string, number>();
   const flowPerStation = new Map<string, number>();

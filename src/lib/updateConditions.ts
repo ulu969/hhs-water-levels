@@ -1,10 +1,10 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./postgres";
 import type { FetchedCondition } from "./eccc";
 
 // Bulk update via unnest, same idiom as upsertReadings — one round trip
 // regardless of station count.
 export async function updateConditions(
-  sql: NeonQueryFunction<false, false>,
+  sql: Sql,
   conditions: FetchedCondition[]
 ): Promise<number> {
   if (conditions.length === 0) return 0;
