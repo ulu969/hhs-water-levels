@@ -11,10 +11,10 @@
 //
 // Usage: npm run backfill-records
 
-import { neon } from "@neondatabase/serverless";
+import { createSql, databaseUrl } from "../src/lib/postgres";
 import { STATION_CODES } from "../src/lib/stations";
 
-if (!process.env.DATABASE_URL) {
+if (!databaseUrl()) {
   try {
     process.loadEnvFile(".env.local");
   } catch {
@@ -95,7 +95,7 @@ async function main() {
   const rows = [...records.values()];
   console.log(`Reduced to ${rows.length} all-time records.`);
 
-  const sql = neon(process.env.DATABASE_URL!);
+  const sql = createSql(databaseUrl()!, { max: 1 });
 
   const stationCodes = rows.map((r) => r.stationCode);
   const parameters = rows.map((r) => r.parameter);
@@ -117,6 +117,7 @@ async function main() {
   `;
 
   console.log(`Upserted ${rows.length} rows into station_records.`);
+  await sql.end();
   for (const r of rows.sort((a, b) => a.stationCode.localeCompare(b.stationCode))) {
     console.log(`  ${r.stationCode} ${r.parameter} ${r.recordType}: ${r.value} on ${r.observedAt}`);
   }

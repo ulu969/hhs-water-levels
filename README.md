@@ -7,16 +7,16 @@ hydrometric web services (`wateroffice.ec.gc.ca`).
 ## How it works
 
 ```
-ECCC recent_real_time_data (CSV) --(Vercel Cron, every 5 min)--> /api/ingest --> Neon Postgres --> Next.js pages
+ECCC recent_real_time_data (CSV) --(Vercel Cron, every 5 min)--> /api/ingest --> Supabase Postgres --> Next.js pages
 ```
 
 - **Ingestion** (`src/app/api/ingest/route.ts`) fetches the latest water
   level (parameter 46) and flow (parameter 47) readings for all 12 stations
   in a single request and upserts them into Postgres. It's triggered by
   Vercel Cron (`vercel.json`), not the browser — see "Scheduling" below.
-- **Storage**: Neon Postgres. Tables: `stations`, `readings`, `thresholds`
-  (flood-stage reference lines), `settings` (ingestion interval), `ingest_runs`
-  (a log for monitoring ingestion health).
+- **Storage**: Supabase Postgres, connected to the Vercel project through the
+  Supabase integration and queried with the `postgres` library. The schema is
+  in `db/schema.sql`; see "Database" below.
 - **Frontend**: a dashboard of station cards (`/`) and a per-station detail
   page (`/station/[code]`) with a Water Level / Flow Rate toggle, a Graph /
   Table toggle, and a time-range picker (24h / 7d / 30d / 1y). Ranges longer
@@ -42,8 +42,9 @@ npm run dev
 ```
 
 `.env.local` needs:
-- `DATABASE_URL` — Neon connection string (already provisioned for this
-  workspace; see below).
+- `DATABASE_URL` — a Postgres connection string. On Vercel the Supabase
+  integration's `POSTGRES_URL` is used instead, and takes priority if both
+  are set.
 - `INGEST_SECRET` — bearer token required to call `/api/ingest`.
 
 To manually trigger an ingestion run locally:
@@ -64,30 +65,37 @@ every pull request and push to `main`.
 
 ### Database
 
-A Neon project (`hhs-water-levels`) has already been provisioned with the
-schema and the 12 stations seeded. To inspect or modify it, use the Neon
-console or `psql "$DATABASE_URL"`.
-
-Tables:
-- `stations(code, name, waterbody, latitude, longitude)`
-- `readings(station_code, parameter, value, unit, observed_at, ingested_at)` —
-  unique on `(station_code, parameter, observed_at)` so re-running ingestion
-  is safe.
-- `thresholds(station_code, parameter, label, value, unit, notes)` — flood
-  watch/warning reference lines shown on the chart. **Empty by default** —
-  no official flood-stage values were populated automatically. Add real
-  thresholds yourself (e.g. from the BC River Forecast Centre or a local
-  flood plan) before relying on this for public information:
+The schema lives in `db/schema.sql` and is safe to re-run. Tables:
+- `stations` — the 12 stations; name and waterbody are seeded by the schema,
+  coordinates by `npm run seed-stations`.
+- `readings` — 5-minute level and flow values, unique on
+  `(station_code, parameter, observed_at)` so re-running ingestion is safe.
+- `level_percentiles`, `flow_percentiles` — ECCC's published daily statistics
+  (`npm run backfill-level-stats`).
+- `station_records` — all-time maximum and minimum (`npm run backfill-records`).
+- `thresholds` — flood watch/warning reference lines shown on the chart.
+  **Empty by default**: add official values yourself (e.g. from the BC River
+  Forecast Centre or a local flood plan) before relying on them:
 
   ```sql
   INSERT INTO thresholds (station_code, parameter, label, value, unit)
   VALUES ('08MG012', 'level', 'Flood Watch', 12.5, 'm');
   ```
-- `settings(key, value)` — currently just `ingest_interval_minutes`, an
-  unread record of intent (the real interval is `vercel.json`'s cron
-  expression, mirrored in `src/lib/config.ts` for the dashboard label).
-- `ingest_runs(started_at, finished_at, stations_ok, stations_failed, rows_inserted, error)` —
-  a log to monitor ingestion health.
+- `ingest_runs` — one row per ingest run, read by the dashboard and
+  `/api/health`.
+
+Row level security is on for every table with no policies, which closes
+Supabase's public REST API to them. The app connects as the database owner,
+so it isn't affected.
+
+#### Setting up a new database
+
+Everything except `thresholds` can be rebuilt from ECCC. Add the Supabase
+`POSTGRES_URL` value as a `DATABASE_URL` repository secret in GitHub, then run
+the **Set up database (manual)** workflow. It applies the schema, then loads
+station coordinates, daily statistics, all-time records and readings. Leave
+"Only count the readings" ticked the first time to see how many rows a
+backfill would add before writing them.
 
 ## Scheduling the 5-minute fetch
 
@@ -105,7 +113,7 @@ by tweaking the cron expression. That workflow is kept only as a manual
 "run it now" fallback (`workflow_dispatch`), not as the real scheduler.
 
 Vercel project env vars needed:
-- `DATABASE_URL`, `INGEST_SECRET` (see "Local setup" above)
+- `POSTGRES_URL` (set by the Supabase integration), `INGEST_SECRET` (see "Local setup" above)
 - `CRON_SECRET` — any random string; Vercel sends it automatically on cron
   requests. Doesn't need to match `INGEST_SECRET`, but can.
 
@@ -148,15 +156,17 @@ It's safe to re-run: inserts are deduplicated on
 `(station_code, parameter, observed_at)`, so a re-run (or a retry of a
 failed chunk) just no-ops on rows it already has.
 
-**Storage warning:** Neon's free tier caps a branch at 512MB. A full
+**Storage warning:** Supabase's free plan caps the database at 500MB and
+turns it read-only past that. A full
 18-month backfill across all 12 stations at 5-minute resolution is roughly
 **3.7 million rows** by rough estimate — enough to approach or exceed that
 limit. The script refuses to run any request estimated above 500,000 rows
 unless you pass `--yes` (scaled by station count and window length together,
 not window length alone), specifically to stop that from happening by
-accident. Start
-with a few months and check `SELECT pg_size_pretty(pg_database_size(current_database()))`
-in the Neon console before going bigger. If you need the full 18 months,
+accident. The script
+also checks the database size before every chunk and stops at 450MB
+(`--max-db-mb=` to change it). Chunks run newest first, so stopping early
+keeps the most recent history. If you need the full 18 months,
 consider only backfilling daily means for the older portion instead of raw
 5-minute data (ECCC's `daily_data` service, ~200x fewer rows) — not yet
 implemented here.
@@ -168,8 +178,9 @@ to retry just the failed range.
 ## Deployment
 
 1. Push this repo to GitHub.
-2. Import it into Vercel (Pro plan, for cron support); add `DATABASE_URL`,
-   `INGEST_SECRET`, and `CRON_SECRET` as environment variables. Vercel picks
+2. Import it into Vercel (Pro plan, for cron support); connect a Supabase
+   database through the Vercel integration (which sets `POSTGRES_URL`), add
+   `INGEST_SECRET` and `CRON_SECRET` as environment variables. Vercel picks
    up `vercel.json`'s cron config automatically on deploy.
 3. (Optional, for the manual fallback) add the `INGEST_URL` / `INGEST_SECRET`
    repository secrets in GitHub so `workflow_dispatch` can reach the deployed

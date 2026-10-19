@@ -10,12 +10,13 @@
     "test": "vitest run",
     "backfill": "tsx scripts/backfill.ts",
     "backfill-level-stats": "tsx scripts/backfillLevelStats.ts",
-    "backfill-records": "tsx scripts/backfillRecords.ts"
+    "backfill-records": "tsx scripts/backfillRecords.ts",
+    "seed-stations": "tsx scripts/seedStations.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
     "leaflet": "^1.9.4",
     "next": "16.4.2",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-leaflet": "^5.0.0",

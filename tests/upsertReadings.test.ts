@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "@/lib/postgres";
 import { upsertReadings } from "@/lib/upsertReadings";
 import type { FetchedReading } from "@/lib/eccc";
 
@@ -12,7 +12,7 @@ function reading(observedAt: string, value: number): FetchedReading {
 function fakeSql(rows: { inserted: boolean }[]) {
   // Called as fn(strings, ...values), so calls[0][1..] are the bound values.
   const fn = vi.fn<(...args: unknown[]) => Promise<typeof rows>>(async () => rows);
-  return { sql: fn as unknown as NeonQueryFunction<false, false>, fn };
+  return { sql: fn as unknown as Sql, fn };
 }
 
 describe("upsertReadings", () => {

@@ -1,4 +1,4 @@
-import type { NeonQueryFunction } from "@neondatabase/serverless";
+import type { Sql } from "./postgres";
 import type { FetchedReading } from "./eccc";
 
 // Bulk upsert via unnest — one round trip regardless of row count, safe to
@@ -6,7 +6,7 @@ import type { FetchedReading } from "./eccc";
 // ECCC revises provisional values after the fact, so a conflicting row takes
 // the newer value; unchanged rows are left alone and not counted.
 export async function upsertReadings(
-  sql: NeonQueryFunction<false, false>,
+  sql: Sql,
   readings: FetchedReading[]
 ): Promise<{ inserted: number; updated: number }> {
   // DO UPDATE fails if one statement touches the same row twice, so collapse
