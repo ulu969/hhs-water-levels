@@ -21,7 +21,7 @@ export interface FetchedReading {
 // Parses the CSV format returned by ECCC's recent_real_time_data / real_time_data
 // services:
 // ID,Date,Parameter/Paramètre,Value/Valeur,Qualifier/Qualificatif,Symbol/Symbole,Approval/Approbation,Grade/Classification,Qualifiers/Qualificatifs
-function parseCsv(csv: string): FetchedReading[] {
+export function parseCsv(csv: string): FetchedReading[] {
   const lines = csv.trim().split(/\r?\n/);
   const readings: FetchedReading[] = [];
 

@@ -52,6 +52,16 @@ To manually trigger an ingestion run locally:
 curl -X POST -H "Authorization: Bearer $INGEST_SECRET" http://localhost:3000/api/ingest
 ```
 
+### Tests
+
+```bash
+npm test        # Vitest unit tests in tests/
+npm run lint
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, tests and a build on
+every pull request and push to `main`.
+
 ### Database
 
 A Neon project (`hhs-water-levels`) has already been provisioned with the

@@ -78,7 +78,7 @@ export async function getStationSnapshots(): Promise<StationSnapshot[]> {
   });
 }
 
-function levelCondition(
+export function levelCondition(
   level: Reading | null,
   band: { p0: number | null; p10: number | null; p90: number | null; p100: number | null }
 ): string {
@@ -99,7 +99,7 @@ function levelCondition(
 // ECCC's ranking is only as current as the discharge reading behind it and our
 // last successful fetch of it. NO_DISCHARGE_DATA passes through unchanged: it
 // already says there's nothing to rank.
-function flowCondition(
+export function flowCondition(
   condition: string | null,
   updatedAt: string | null,
   flow: Reading | null
