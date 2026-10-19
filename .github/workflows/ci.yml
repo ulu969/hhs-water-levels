@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      # The build needs DATABASE_URL to be set, not reachable: every page is
+      # rendered on demand, so nothing queries the database at build time.
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost/ci
