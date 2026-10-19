@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { formatNextUpdate, formatRelativeTime, formatValue, isStale } from "@/lib/format";
+import {
+  formatChange,
+  formatNextUpdate,
+  formatRelativeTime,
+  formatValue,
+  isStale,
+} from "@/lib/format";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
 import { getConditionInfo, isConditionUnavailable } from "@/lib/conditions";
 import { getStationSnapshots } from "@/lib/queries";
-import type { Reading } from "@/lib/types";
+import type { LatestReading } from "@/lib/types";
 import AutoRefresh from "@/components/AutoRefresh";
 
 export const dynamic = "force-dynamic";
@@ -99,13 +105,26 @@ function ConditionBadge({ code }: { code: string | null }) {
   );
 }
 
+const TREND_ARROWS = { up: "\u2191", down: "\u2193", steady: "\u2192" } as const;
+
+// Neutral colour on purpose: whether rising water is good or bad depends on
+// the season and the station.
+function Trend({ change, unit }: { change: number; unit: string }) {
+  const { direction, text } = formatChange(change, unit);
+  return (
+    <p className="text-xs tabular-nums text-black/60 dark:text-white/60">
+      <span aria-hidden="true">{TREND_ARROWS[direction]}</span> {text}
+    </p>
+  );
+}
+
 function Metric({
   label,
   reading,
   badge,
 }: {
   label: string;
-  reading: Reading | null;
+  reading: LatestReading | null;
   badge?: React.ReactNode;
 }) {
   if (!reading) {
@@ -118,13 +137,14 @@ function Metric({
     );
   }
 
-  const { value, unit, observedAt } = reading;
+  const { value, unit, observedAt, change24h } = reading;
   const stale = isStale(observedAt);
 
   return (
     <div>
       <p className="text-xs text-black/50 dark:text-white/50">{label}</p>
       <p className="text-lg font-semibold tabular-nums">{formatValue(value, unit)}</p>
+      {change24h != null && <Trend change={change24h} unit={unit} />}
       <p className={`text-xs ${stale ? "text-amber-600 dark:text-amber-400" : "text-black/40 dark:text-white/40"}`}>
         {formatRelativeTime(observedAt)}
       </p>

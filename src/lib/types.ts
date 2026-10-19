@@ -20,6 +20,12 @@ export interface Reading {
   unit: string;
 }
 
+// The newest reading plus how far it has moved over the previous 24 hours.
+// change24h is null when there's no reading from about a day earlier.
+export interface LatestReading extends Reading {
+  change24h: number | null;
+}
+
 export interface Threshold {
   parameter: Parameter;
   label: string;
