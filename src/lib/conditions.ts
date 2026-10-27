@@ -88,6 +88,14 @@ export function getConditionInfo(code: string | null | undefined): ConditionInfo
   return CONDITION_INFO[code as ConditionCode] ?? FALLBACK;
 }
 
+export function isHighCondition(code: string | null | undefined): boolean {
+  return code === "ALL_TIME_HIGH" || code === "MUCH_ABOVE_NORMAL";
+}
+
+export function isLowCondition(code: string | null | undefined): boolean {
+  return code === "ALL_TIME_LOW" || code === "MUCH_BELOW_NORMAL";
+}
+
 const OUT_OF_RANGE_CODES: ReadonlySet<string> = new Set([
   "ALL_TIME_HIGH",
   "MUCH_ABOVE_NORMAL",

@@ -3,6 +3,8 @@ import {
   classifyByPercentile,
   getConditionInfo,
   isConditionUnavailable,
+  isHighCondition,
+  isLowCondition,
   isOutOfRange,
 } from "@/lib/conditions";
 
@@ -42,5 +44,22 @@ describe("condition helpers", () => {
   it("falls back to Unknown for codes ECCC might add later", () => {
     expect(getConditionInfo("SOMETHING_NEW")?.label).toBe("Unknown");
     expect(getConditionInfo(null)).toBeNull();
+  });
+});
+
+describe("isHighCondition / isLowCondition", () => {
+  it.each([
+    ["ALL_TIME_HIGH", true, false],
+    ["MUCH_ABOVE_NORMAL", true, false],
+    ["ABOVE_NORMAL", false, false],
+    ["NORMAL", false, false],
+    ["BELOW_NORMAL", false, false],
+    ["MUCH_BELOW_NORMAL", false, true],
+    ["ALL_TIME_LOW", false, true],
+    ["STALE_DATA", false, false],
+    [null, false, false],
+  ])("%s → high %s, low %s", (code, high, low) => {
+    expect(isHighCondition(code)).toBe(high);
+    expect(isLowCondition(code)).toBe(low);
   });
 });
