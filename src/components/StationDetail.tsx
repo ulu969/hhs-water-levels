@@ -195,138 +195,6 @@ export default function StationDetail({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <ToggleGroup
-          value={parameter}
-          onChange={(v) => setParameter(v as Parameter)}
-          options={[
-            { value: "level", label: "Water Level" },
-            { value: "flow", label: "Flow Rate" },
-          ]}
-        />
-        <ToggleGroup
-          value={view}
-          onChange={(v) => setView(v as View)}
-          options={[
-            { value: "chart", label: "Graph" },
-            { value: "table", label: "Table" },
-          ]}
-        />
-        <select
-          value={range}
-          onChange={(e) => setRange(e.target.value as Range)}
-          className="rounded-md border border-black/15 dark:border-white/15 bg-transparent px-3 py-1.5 text-sm"
-        >
-          {RANGES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {parameter === "level" && (
-        <p>
-          {levelConditionInfo && (
-            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${levelConditionInfo.badgeClass}`}>
-              {levelConditionInfo.label}
-            </span>
-          )}
-          {station.currentLevelConditionUpdatedAt && (
-            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
-              as of {formatRelativeTime(station.currentLevelConditionUpdatedAt)}
-            </span>
-          )}
-          <a
-            href={ecccReportUrl(station.code)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
-          >
-            View on ECCC
-            {relevantStatLabel(station.currentLevelCondition) &&
-              ` (tick "${relevantStatLabel(station.currentLevelCondition)}")`}{" "}
-            &rarr;
-          </a>
-        </p>
-      )}
-      {parameter === "flow" && (
-        <p>
-          {flowConditionInfo && (
-            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${flowConditionInfo.badgeClass}`}>
-              {flowConditionInfo.label}
-            </span>
-          )}
-          {station.currentConditionUpdatedAt && (
-            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
-              as of {formatRelativeTime(station.currentConditionUpdatedAt)}
-            </span>
-          )}
-          <a
-            href={ecccReportUrl(station.code)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
-          >
-            View on ECCC
-            {relevantStatLabel(station.currentCondition) &&
-              ` (tick "${relevantStatLabel(station.currentCondition)}")`}{" "}
-            &rarr;
-          </a>
-        </p>
-      )}
-      {relevantThresholds.length > 0 && (
-        <div className="flex flex-wrap gap-3 text-xs">
-          {relevantThresholds.map((t) => (
-            <span
-              key={t.label}
-              className="rounded-full border border-black/15 dark:border-white/15 px-2.5 py-1"
-            >
-              {t.label}: {formatValue(t.value, t.unit)}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {view === "chart" && (
-        <fieldset className="flex flex-wrap items-center gap-2 text-sm sm:gap-x-4">
-          <legend className="sr-only">Published historical daily statistics</legend>
-          <span className="shrink-0 text-xs text-black/55 dark:text-white/55 sm:text-sm">
-            Published history:
-          </span>
-          <HistoricalToggle
-            label="Maximum"
-            variant="maximum"
-            checked={showHistoricalMax}
-            disabled={status !== "ready" || !historicalMaxAvailable}
-            onChange={setShowHistoricalMax}
-          />
-          <HistoricalToggle
-            label="Minimum"
-            variant="minimum"
-            checked={showHistoricalMin}
-            disabled={status !== "ready" || !historicalMinAvailable}
-            onChange={setShowHistoricalMin}
-          />
-        </fieldset>
-      )}
-
-      {status === "ready" &&
-        (provisionalHighReadings.length > 0 || provisionalLowReadings.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 font-medium text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200">
-            Provisional new record
-          </span>
-          <span className="text-black/55 dark:text-white/55">
-            {formatProvisionalRecordSummary(
-              provisionalLowReadings.length,
-              provisionalHighReadings.length,
-              historicalThroughYear
-            )}
-          </span>
-        </div>
-      )}
-
       {status === "loading" && (
         <p className="text-sm text-black/50 dark:text-white/50">Loading readings&hellip;</p>
       )}
@@ -459,6 +327,139 @@ export default function StationDetail({
           </table>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center gap-4">
+        <ToggleGroup
+          value={parameter}
+          onChange={(v) => setParameter(v as Parameter)}
+          options={[
+            { value: "level", label: "Water Level" },
+            { value: "flow", label: "Flow Rate" },
+          ]}
+        />
+        <ToggleGroup
+          value={view}
+          onChange={(v) => setView(v as View)}
+          options={[
+            { value: "chart", label: "Graph" },
+            { value: "table", label: "Table" },
+          ]}
+        />
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value as Range)}
+          className="rounded-md border border-black/15 dark:border-white/15 bg-transparent px-3 py-1.5 text-sm"
+        >
+          {RANGES.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {parameter === "level" && (
+        <p>
+          {levelConditionInfo && (
+            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${levelConditionInfo.badgeClass}`}>
+              {levelConditionInfo.label}
+            </span>
+          )}
+          {station.currentLevelConditionUpdatedAt && (
+            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
+              as of {formatRelativeTime(station.currentLevelConditionUpdatedAt)}
+            </span>
+          )}
+          <a
+            href={ecccReportUrl(station.code)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+          >
+            View on ECCC
+            {relevantStatLabel(station.currentLevelCondition) &&
+              ` (tick "${relevantStatLabel(station.currentLevelCondition)}")`}{" "}
+            &rarr;
+          </a>
+        </p>
+      )}
+      {parameter === "flow" && (
+        <p>
+          {flowConditionInfo && (
+            <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${flowConditionInfo.badgeClass}`}>
+              {flowConditionInfo.label}
+            </span>
+          )}
+          {station.currentConditionUpdatedAt && (
+            <span className="ml-2 text-xs text-black/40 dark:text-white/40">
+              as of {formatRelativeTime(station.currentConditionUpdatedAt)}
+            </span>
+          )}
+          <a
+            href={ecccReportUrl(station.code)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 text-xs underline text-black/60 dark:text-white/60"
+          >
+            View on ECCC
+            {relevantStatLabel(station.currentCondition) &&
+              ` (tick "${relevantStatLabel(station.currentCondition)}")`}{" "}
+            &rarr;
+          </a>
+        </p>
+      )}
+      {relevantThresholds.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-xs">
+          {relevantThresholds.map((t) => (
+            <span
+              key={t.label}
+              className="rounded-full border border-black/15 dark:border-white/15 px-2.5 py-1"
+            >
+              {t.label}: {formatValue(t.value, t.unit)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {view === "chart" && (
+        <fieldset className="flex flex-wrap items-center gap-2 text-sm sm:gap-x-4">
+          <legend className="sr-only">Published historical daily statistics</legend>
+          <span className="shrink-0 text-xs text-black/55 dark:text-white/55 sm:text-sm">
+            Published history:
+          </span>
+          <HistoricalToggle
+            label="Maximum"
+            variant="maximum"
+            checked={showHistoricalMax}
+            disabled={status !== "ready" || !historicalMaxAvailable}
+            onChange={setShowHistoricalMax}
+          />
+          <HistoricalToggle
+            label="Minimum"
+            variant="minimum"
+            checked={showHistoricalMin}
+            disabled={status !== "ready" || !historicalMinAvailable}
+            onChange={setShowHistoricalMin}
+          />
+        </fieldset>
+      )}
+
+      {status === "ready" &&
+        (provisionalHighReadings.length > 0 || provisionalLowReadings.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="rounded-full border border-orange-300 bg-orange-50 px-2.5 py-1 font-medium text-orange-800 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-200">
+            Provisional new record
+          </span>
+          <span className="text-black/55 dark:text-white/55">
+            {formatProvisionalRecordSummary(
+              provisionalLowReadings.length,
+              provisionalHighReadings.length,
+              historicalThroughYear
+            )}
+          </span>
+        </div>
+      )}
+
 
       {recordGroups.length > 0 && (
         <section
