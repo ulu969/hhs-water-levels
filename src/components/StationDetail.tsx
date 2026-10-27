@@ -229,15 +229,6 @@ export default function StationDetail({
         </p>
       )}
 
-      {status === "ready" && readings.length > 0 && view === "chart" && isSmallScreen && (
-        <div className="min-h-28 rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03] sm:hidden">
-          <p className="mb-2 text-xs text-black/45 dark:text-white/45">
-            Chart details &middot; tap or drag across the graph
-          </p>
-          <div ref={setMobileTooltipTarget} className="relative min-h-20" aria-live="polite" />
-        </div>
-      )}
-
       {status === "ready" && readings.length > 0 && view === "chart" && (
         <div className="h-80 w-full rounded-lg border border-black/10 dark:border-white/10 p-4">
           <ResponsiveContainer width="100%" height="100%">
@@ -322,6 +313,15 @@ export default function StationDetail({
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {status === "ready" && readings.length > 0 && view === "chart" && isSmallScreen && (
+        <div className="min-h-28 rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03] sm:hidden">
+          <p className="mb-2 text-xs text-black/45 dark:text-white/45">
+            Chart details &middot; tap or drag across the graph
+          </p>
+          <div ref={setMobileTooltipTarget} className="relative min-h-20" aria-live="polite" />
         </div>
       )}
 
