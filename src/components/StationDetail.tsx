@@ -275,35 +275,6 @@ export default function StationDetail({
           </a>
         </p>
       )}
-      {recordGroups.length > 0 && (
-        <section
-          aria-labelledby="all-time-records-heading"
-          className="rounded-lg border border-black/10 p-4 dark:border-white/10"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="all-time-records-heading" className="text-sm font-semibold">
-              All-time records
-            </h2>
-            <Link
-              href="/historical-values"
-              className="inline-flex items-center gap-1 rounded-full border border-black/15 px-2.5 py-1 text-xs text-black/60 transition-colors hover:border-black/30 hover:text-black dark:border-white/15 dark:text-white/60 dark:hover:border-white/30 dark:hover:text-white"
-            >
-              Why these values can differ
-              <span aria-hidden="true">?</span>
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            {recordGroups.map((group) => (
-              <RecordGroup
-                key={group.parameter}
-                parameter={group.parameter}
-                records={group.records}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {relevantThresholds.length > 0 && (
         <div className="flex flex-wrap gap-3 text-xs">
           {relevantThresholds.map((t) => (
@@ -487,6 +458,35 @@ export default function StationDetail({
             </tbody>
           </table>
         </div>
+      )}
+
+      {recordGroups.length > 0 && (
+        <section
+          aria-labelledby="all-time-records-heading"
+          className="rounded-lg border border-black/10 p-4 dark:border-white/10"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="all-time-records-heading" className="text-sm font-semibold">
+              All-time records
+            </h2>
+            <Link
+              href="/historical-values"
+              className="inline-flex items-center gap-1 rounded-full border border-black/15 px-2.5 py-1 text-xs text-black/60 transition-colors hover:border-black/30 hover:text-black dark:border-white/15 dark:text-white/60 dark:hover:border-white/30 dark:hover:text-white"
+            >
+              Why these values can differ
+              <span aria-hidden="true">?</span>
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {recordGroups.map((group) => (
+              <RecordGroup
+                key={group.parameter}
+                parameter={group.parameter}
+                records={group.records}
+              />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
