@@ -16,7 +16,12 @@ import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
 import { useVisibleInterval } from "@/lib/useVisibleInterval";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
-import { getConditionInfo, relevantStatLabel } from "@/lib/conditions";
+import {
+  getConditionInfo,
+  isHighCondition,
+  isLowCondition,
+  relevantStatLabel,
+} from "@/lib/conditions";
 import {
   RANGES,
   defaultStationView,
@@ -71,8 +76,23 @@ export default function StationDetail({
       window.history.replaceState(null, "", `${window.location.pathname}${query}`);
     }
   }, [parameter, range, view, hasLevelData, hasFlowData]);
-  const [showHistoricalMax, setShowHistoricalMax] = useState(false);
-  const [showHistoricalMin, setShowHistoricalMin] = useState(false);
+  // Pre-tick the published max/min line that matches the station's current
+  // extreme condition, re-applied whenever the parameter changes since level
+  // and flow carry their own condition.
+  const conditionFor = (p: Parameter) =>
+    p === "level" ? station.currentLevelCondition : station.currentCondition;
+  const [showHistoricalMax, setShowHistoricalMax] = useState(() =>
+    isHighCondition(conditionFor(parameter))
+  );
+  const [showHistoricalMin, setShowHistoricalMin] = useState(() =>
+    isLowCondition(conditionFor(parameter))
+  );
+  const [historicalTogglesFor, setHistoricalTogglesFor] = useState(parameter);
+  if (historicalTogglesFor !== parameter) {
+    setHistoricalTogglesFor(parameter);
+    setShowHistoricalMax(isHighCondition(conditionFor(parameter)));
+    setShowHistoricalMin(isLowCondition(conditionFor(parameter)));
+  }
   const [mobileTooltipTarget, setMobileTooltipTarget] = useState<HTMLDivElement | null>(null);
   const [loaded, setLoaded] = useState<{
     key: string;
