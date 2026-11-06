@@ -6,7 +6,9 @@ import AutoRefresh from "@/components/AutoRefresh";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
 import { getStationSnapshots } from "@/lib/queries";
 import { parseStationView } from "@/lib/stationView";
-import type { Station, StationRecord, Threshold } from "@/lib/types";
+import { getDayHistory } from "@/lib/thisDayQueries";
+import type { DayHistory } from "@/lib/thisDay";
+import type { LatestReading, Parameter, Station, StationRecord, Threshold } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +16,27 @@ interface StationPageData {
   station: Station;
   hasLevelData: boolean;
   hasFlowData: boolean;
+  level: LatestReading | null;
+  flow: LatestReading | null;
 }
 
 async function getStation(code: string): Promise<StationPageData | null> {
   const snapshot = (await getStationSnapshots()).find((s) => s.code === code);
   if (!snapshot) return null;
   const { level, flow, ...station } = snapshot;
-  return { station, hasLevelData: level != null, hasFlowData: flow != null };
+  return { station, hasLevelData: level != null, hasFlowData: flow != null, level, flow };
+}
+
+// The "This day" view's history. A failure here shouldn't take the whole
+// station page down, so it falls back to "no history" instead.
+async function getDayHistorySafe(code: string, parameter: Parameter, hasData: boolean) {
+  if (!hasData) return null;
+  try {
+    return await getDayHistory(code, parameter);
+  } catch (err) {
+    console.error(`day history ${code} ${parameter}`, err);
+    return null;
+  }
 }
 
 async function getRecords(code: string): Promise<StationRecord[]> {
@@ -61,13 +77,19 @@ export default async function StationPage({
   const { code } = await params;
   const stationData = await getStation(code);
   if (!stationData) notFound();
-  const { station, hasLevelData, hasFlowData } = stationData;
+  const { station, hasLevelData, hasFlowData, level, flow } = stationData;
 
-  const [thresholds, records, query] = await Promise.all([
+  const [thresholds, records, query, levelHistory, flowHistory] = await Promise.all([
     getThresholds(code),
     getRecords(code),
     searchParams,
+    getDayHistorySafe(code, "level", hasLevelData),
+    getDayHistorySafe(code, "flow", hasFlowData),
   ]);
+  const dayHistory: { level: DayHistory | null; flow: DayHistory | null } = {
+    level: levelHistory,
+    flow: flowHistory,
+  };
   const initialView = parseStationView(query, { hasLevelData, hasFlowData });
 
   // Refreshes the condition badges and "as of" times; StationDetail re-fetches
@@ -83,6 +105,8 @@ export default async function StationPage({
         hasLevelData={hasLevelData}
         hasFlowData={hasFlowData}
         initialView={initialView}
+        latest={{ level, flow }}
+        dayHistory={dayHistory}
       />
     </AutoRefresh>
   );

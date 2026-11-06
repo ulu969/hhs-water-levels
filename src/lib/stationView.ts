@@ -2,6 +2,8 @@ import type { Parameter } from "./types";
 
 // The station page's chart choices, kept in the URL so a refresh keeps them
 // and a link like /station/08MG013?p=flow&range=7d&view=table can be shared.
+// view=day is the "This day" view: today's reading against every earlier
+// year's value for the same calendar date.
 
 export const RANGES = [
   { value: "24h", label: "Last 24 hours" },
@@ -11,7 +13,7 @@ export const RANGES = [
 ] as const;
 
 export type Range = (typeof RANGES)[number]["value"];
-export type View = "chart" | "table";
+export type View = "chart" | "table" | "day";
 
 export interface StationView {
   parameter: Parameter;
@@ -49,7 +51,7 @@ export function parseStationView(
         ? p
         : defaults.parameter,
     range: RANGES.some((r) => r.value === range) ? (range as Range) : defaults.range,
-    view: view === "chart" || view === "table" ? view : defaults.view,
+    view: view === "chart" || view === "table" || view === "day" ? view : defaults.view,
   };
 }
 

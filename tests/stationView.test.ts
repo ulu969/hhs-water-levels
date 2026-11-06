@@ -17,6 +17,10 @@ describe("parseStationView", () => {
     });
   });
 
+  it("accepts the This day view", () => {
+    expect(parseStationView({ view: "day" }, both).view).toBe("day");
+  });
+
   it("ignores values it doesn't know", () => {
     expect(parseStationView({ p: "temp", range: "5y", view: "pie" }, both)).toEqual(
       defaultStationView(both)

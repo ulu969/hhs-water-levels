@@ -12,7 +12,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Parameter, Resolution, Station, StationRecord, Threshold } from "@/lib/types";
+import type {
+  LatestReading,
+  Parameter,
+  Resolution,
+  Station,
+  StationRecord,
+  Threshold,
+} from "@/lib/types";
+import type { DayHistory } from "@/lib/thisDay";
+import ThisDayPanel from "./ThisDayPanel";
 import { formatRelativeTime, formatTimestamp, formatValue } from "@/lib/format";
 import { useVisibleInterval } from "@/lib/useVisibleInterval";
 import { INGEST_INTERVAL_MINUTES } from "@/lib/config";
@@ -53,6 +62,8 @@ export default function StationDetail({
   hasLevelData,
   hasFlowData,
   initialView,
+  latest,
+  dayHistory,
 }: {
   station: Station;
   thresholds: Threshold[];
@@ -60,6 +71,8 @@ export default function StationDetail({
   hasLevelData: boolean;
   hasFlowData: boolean;
   initialView: StationView;
+  latest: { level: LatestReading | null; flow: LatestReading | null };
+  dayHistory: { level: DayHistory | null; flow: DayHistory | null };
 }) {
   const [parameter, setParameter] = useState<Parameter>(initialView.parameter);
   const [range, setRange] = useState<Range>(initialView.range);
@@ -215,18 +228,26 @@ export default function StationDetail({
         )}
       </div>
 
-      {status === "loading" && (
+      {view !== "day" && status === "loading" && (
         <p className="text-sm text-black/50 dark:text-white/50">Loading readings&hellip;</p>
       )}
-      {status === "error" && (
+      {view !== "day" && status === "error" && (
         <p className="text-sm text-red-600 dark:text-red-400">
           Could not load readings. Try again shortly.
         </p>
       )}
-      {status === "ready" && readings.length === 0 && (
+      {view !== "day" && status === "ready" && readings.length === 0 && (
         <p className="text-sm text-black/50 dark:text-white/50">
           No readings available for this range yet.
         </p>
+      )}
+
+      {view === "day" && (
+        <ThisDayPanel
+          parameter={parameter}
+          latest={latest[parameter]}
+          history={dayHistory[parameter]}
+        />
       )}
 
       {status === "ready" && readings.length > 0 && view === "chart" && (
@@ -363,8 +384,10 @@ export default function StationDetail({
           options={[
             { value: "chart", label: "Graph" },
             { value: "table", label: "Table" },
+            { value: "day", label: "This day" },
           ]}
         />
+        {view !== "day" && (
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as Range)}
@@ -376,6 +399,7 @@ export default function StationDetail({
             </option>
           ))}
         </select>
+        )}
       </div>
 
       {parameter === "level" && (
