@@ -73,6 +73,10 @@ The schema lives in `db/schema.sql` and is safe to re-run. Tables:
 - `level_percentiles`, `flow_percentiles` — ECCC's published daily statistics
   (`npm run backfill-level-stats`).
 - `station_records` — all-time maximum and minimum (`npm run backfill-records`).
+- `daily_history` — every approved daily mean from ECCC's `daily_data` (HYDAT)
+  service, keyed by calendar date, for the station page's "This day" view
+  (`npm run backfill-daily-history`, or the **Load daily history (manual)**
+  workflow; tick "Only count rows" first to see the size).
 - `thresholds` — flood watch/warning reference lines shown on the chart.
   **Empty by default**: add official values yourself (e.g. from the BC River
   Forecast Centre or a local flood plan) before relying on them:
@@ -93,7 +97,8 @@ so it isn't affected.
 Everything except `thresholds` can be rebuilt from ECCC. Add the Supabase
 `POSTGRES_URL` value as a `DATABASE_URL` repository secret in GitHub, then run
 the **Set up database (manual)** workflow. It applies the schema, then loads
-station coordinates, daily statistics, all-time records and readings. Leave
+station coordinates, daily statistics, all-time records, daily history and
+readings. Leave
 "Only count the readings" ticked the first time to see how many rows a
 backfill would add before writing them.
 

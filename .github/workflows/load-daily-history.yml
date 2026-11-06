@@ -1,0 +1,41 @@
+name: Load daily history (manual)
+
+# Loads ECCC's approved daily means into daily_history for the station page's
+# "This day" view, without re-running the rest of "Set up database". Applies
+# the schema first so the table exists. Safe to re-run: rows are upserted.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only count rows and estimate the size, without writing
+        type: boolean
+        default: true
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Apply schema
+        run: |
+          url=$(node -e 'const u = new URL(process.env.DATABASE_URL); u.searchParams.delete("supa"); console.log(u.toString())')
+          psql "$url" -v ON_ERROR_STOP=1 -q -f db/schema.sql
+
+      - name: Daily history
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm run backfill-daily-history -- --dry-run
+          else
+            npm run backfill-daily-history
+          fi
