@@ -47,6 +47,9 @@ jobs:
       - name: All-time records
         run: npm run backfill-records
 
+      - name: Daily history (for the "This day" view)
+        run: npm run backfill-daily-history
+
       - name: Readings
         env:
           MONTHS: ${{ inputs.months }}

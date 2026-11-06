@@ -127,3 +127,20 @@ ALTER TABLE flow_percentiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE station_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE thresholds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ingest_runs ENABLE ROW LEVEL SECURITY;
+
+-- One approved daily mean per station, parameter and date, from ECCC's
+-- daily_data (HYDAT) service, going back to the start of each station's
+-- record. The station page's "This day" view ranks today's reading against
+-- every earlier year's value for the same calendar date, so the key leads
+-- with (month, day) to make that a single index lookup. Written by
+-- scripts/backfillDailyHistory.ts.
+CREATE TABLE IF NOT EXISTS daily_history (
+  station_code text NOT NULL REFERENCES stations(code),
+  parameter text NOT NULL CHECK (parameter IN ('level', 'flow')),
+  month smallint NOT NULL,
+  day smallint NOT NULL,
+  year smallint NOT NULL,
+  value float8 NOT NULL,
+  PRIMARY KEY (station_code, parameter, month, day, year)
+);
+ALTER TABLE daily_history ENABLE ROW LEVEL SECURITY;
